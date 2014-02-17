@@ -1,5 +1,12 @@
-#!/bin/sh
-
+#!/bin/bash
+#
+# history
+#
+# Rev	Date		Name	notes
+# 1	2011-3-29	7K3VEY	sanko:	http://yuzuru.2ch.net/test/read.cgi/pc2nanmin/1271066265/343
+#					http://gist.github.com/875864
+# 0	2010-5-2	7K3VEY	first issue.
+ 
 export PATH=/usr/lib/qt-3.3/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/home/haru/bin
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH
@@ -15,6 +22,9 @@ usage(){
 	echo "            TOKYO FM     : FMT" >&2
 	echo "            InterFM      : INT" >&2
 	echo "            J-WAVE       : FMJ" >&2
+	echo "            bayfm78      : BAYFM78" >&2
+	echo "            NACK5        : NACK5" >&2
+	echo "            FMヨコハマ   : YFM" >&2
 	echo "  time      Stop at num seconds into stream" >&2
 	echo "  name      output file name" >&2
 }
@@ -28,6 +38,9 @@ station_check(){
 		FMT)	STATION='TOKYO FM'		;;
 		INT)	STATION='InterFM'		;;
 		FMJ)	STATION='J-WAVE'		;;
+		BAYFM78)STATION='bayfm78'		;;
+		NACK5)	STATION='NACK5'			;;
+		YFM)	STATION='FMヨコハマ'	;;
 		*)		usage
 				exit 1
 				;;
@@ -43,19 +56,19 @@ time_check(){
 }
 
 #28時間制の日時を作成。
-H=`date '+%H'`
+H=`date '+%k'`
 declare -i HH
 if [ $H -le 4 ]; then
 	HH=$H+24
 	HHH=`printf '%02d\n' $HH`
-	YMD=`date --date '1 days ago' '+%Y%m%d'`
+	YMD=`date --date '1 days ago' '+%Y%m%d(%a)'`
 	YEAR=`date --date '1 days ago' '+%Y'`
 	YMD_HMS=`date --date '1 days ago' "+%Y%m%d_$HHH%M%S"`
 	JYMD_HM=`date --date '1 days ago' "+%x $HHH時%M分"`
 else
-	HH=$H
+	HH="$H"
 	HHH=`printf '%02d\n' $HH`
-	YMD=`date '+%Y%m%d'`
+	YMD=`date '+%Y%m%d(%a)'`
 	YEAR=`date '+%Y'`
 	YMD_HMS=`date "+%Y%m%d_$HHH%M%S"`
 	JYMD_HM=`date "+%x $HHH時%M分"`
@@ -83,47 +96,188 @@ else
 	exit 3
 fi
 declare -i REC_MIN=$STOP/60
+FLV="${FILE}.flv"
+MP3="${FILE}.mp3"
 
+mkdir -p "${DIR}"
 
-mkdir -p "$DIR"
+rec_time=10  # sec
+file_prefix=$1
+##file_prefix=joqr
+file_suffix=`date +%Y-%m-%d-%H%M`
+#file_name=$file_prefix-$file_suffix
 
-rtmpdump --stop $STOP \
---rtmp "rtmpe://radiko.smartstream.ne.jp" \
---playpath "simul-stream" \
---app "$ST/_defInst_" \
---flashVer "WIN 10,0,45,2" \
---live \
---flv "${FILE}.flv"
+server_name=radiko.smartstream.ne.jp
+#server_name=7k3vey-macromedia-fcs.ham-radio-op.net # for cyukei but old
+#server_name=localhost  # for test
+server_port=1935
 
-ffmpeg -i "${FILE}.flv" \
--vn -acodec libmp3lame -ab 48k \
-"${FILE}.mp3"
+echo YMD : $YMD
+echo DIR : $DIR
+echo FLV : $FLV
+echo MP3 : $MP3
+#exit
 
+playerurl=http://radiko.jp/player/swf/player_2.0.1.00.swf
+playerfile="${HOME}/bin/player.swf"
+keyfile="${HOME}/bin/authkey.png"
+authfile="${HOME}/bin/auth1_fms.$$"
+authfile2="${HOME}/bin/auth2_fms.$$"
 
-#eyeD3 \
-#--album="$NAME" \
-#--title="$NAME" \
-#--year="$YEAR"  \
-#--comment="jpn:date:${JYMD_HM}～${REC_MIN}分" \
-#"${FILE}.mp3"
+channel=$1
+if [ $# -eq 1 ]; then
+  output="${FLV}"
+elif [ $# -eq 2 ]; then
+  rec_time=$2
+  output="${FLV}"
+elif [ $# -eq 3 ]; then
+  rec_time=$2
+  output=$3
+else
+  echo "usage : $0 channel_name [rectime(sec)] [outputfile]"
+  exit 1
+fi
 
-#mp3gain "$DIR/${YMD_HMS}_${ST}_${STOP}.mp3"
-#TMPFILE=`mktemp`
 #
-#mp3gain -s c "$DIR/${YMD_HMS}_${ST}_${STOP}.mp3" > $TMPFILE
-#mp3gain -s d "$DIR/${YMD_HMS}_${ST}_${STOP}.mp3"
+# get player
 #
-#TRACK_GAIN=`awk '/^Recommended "Track" dB / { printf("%+.2f dB", $5)   }' $TMPFILE`
-#ALBUM_GAIN=`awk '/^Recommended "Album" dB / { printf("%+.2f dB", $5)   }' $TMPFILE`
-#TRACK_PEAK=`awk '/^Max PCM /                { printf("%.6f", $7/32768) }' $TMPFILE`
-#ALBUM_PEAK=`awk '/^Max Album PCM /          { printf("%.6f", $8/32768) }' $TMPFILE`
+if [ ! -f $playerfile ]; then
+wget -q -O $playerfile $playerurl
+
+  if [ $? -ne 0 ]; then
+echo "failed get player"
+    exit 1
+  fi
+fi
+
 #
-#eyeD3 \
-#--set-user-text-frame="replaygain_track_gain:$TRACK_GAIN" \
-#--set-user-text-frame="replaygain_track_peak:$TRACK_PEAK" \
-#--set-user-text-frame="replaygain_album_gain:$ALBUM_GAIN" \
-#--set-user-text-frame="replaygain_album_peak:$ALBUM_PEAK" \
-#"$DIR/${YMD_HMS}_${ST}_${STOP}.mp3"
+# get keydata (need swftools)
 #
-#rm -f $TMPFILE
+if [ ! -f $keyfile ]; then
+swfextract -b 5 $playerfile -o $keyfile
+
+  if [ ! -f $keyfile ]; then
+echo "failed get keydata"
+    exit 1
+  fi
+fi
+
+if [ -f $authfile ]; then
+rm -f $authfile
+fi
+
+#
+# access auth1_fms
+#
+wget -q \
+     --header="pragma: no-cache" \
+     --header="X-Radiko-App: pc_1" \
+     --header="X-Radiko-App-Version: 2.0.1" \
+     --header="X-Radiko-User: test-stream" \
+     --header="X-Radiko-Device: pc" \
+     --post-data='\r\n' \
+     --no-check-certificate \
+     --save-headers \
+     -O $authfile \
+     https://radiko.jp/v2/api/auth1_fms
+
+if [ $? -ne 0 ]; then
+echo "failed auth1 process"
+  exit 1
+fi
+
+#
+# get partial key
+#
+authtoken=`cat $authfile | perl -ne 'print $1 if(/x-radiko-authtoken: ([\w-]+)/i)'`
+offset=`cat $authfile | perl -ne 'print $1 if(/x-radiko-keyoffset: (\d+)/i)'`
+length=`cat $authfile | perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)'`
+
+partialkey=`dd if=$keyfile bs=1 skip=${offset} count=${length} 2> /dev/null | base64`
+
+echo "authtoken: ${authtoken} \noffset: ${offset} length: ${length} \npartialkey: $partialkey"
+
+rm -f $authfile
+
+if [ -f $authfile2 ]; then
+rm -f $authfile2
+fi
+
+#
+# access auth2_fms
+#
+wget -q \
+     --header="pragma: no-cache" \
+     --header="X-Radiko-App: pc_1" \
+     --header="X-Radiko-App-Version: 2.0.1" \
+     --header="X-Radiko-User: test-stream" \
+     --header="X-Radiko-Device: pc" \
+     --header="X-Radiko-Authtoken: ${authtoken}" \
+     --header="X-Radiko-Partialkey: ${partialkey}" \
+     --post-data='\r\n' \
+     --no-check-certificate \
+     -O $authfile2 \
+     https://radiko.jp/v2/api/auth2_fms
+
+if [ $? -ne 0 -o ! -f $authfile2 ]; then
+echo "failed auth2 process"
+  exit 1
+fi
+
+echo "authentication success"
+
+areaid=`cat $authfile2 | perl -ne 'print $1 if(/^([^,]+),/i)'`
+echo "areaid: $areaid"
+
+rm -f $authfile2
+
+#
+# rtmpdump
+#
+rtmpdump -v \
+	 --stop $rec_time \
+         -r "rtmpe://$server_name:$server_port" \
+         --playpath "simul-stream" \
+         --app "${channel}/_defInst_" \
+         -W $playerurl \
+         -C S:"" -C S:"" -C S:"" -C S:$authtoken \
+         --live \
+         --flv "${FLV}"
+
+RETVAL1=$?
+#if [ $RETVAL != 0 ]; then
+#	exit 1
+#fi
+
+#
+# ffmpeg flv->mp3
+#
+date
+/usr/local/bin/ffmpeg -y -i "${FLV}" -acodec libmp3lame -aq 9 "${MP3}"
+RETVAL2=$?
+date
+
+#if [ $RETVAL != 0 ]; then
+#	exit 2
+#fi
+
+MAX='130'
+MIN='120'
+FLV_SIZE=`ls -l "${FLV}" | awk '{ print $5}'`
+MP3_SIZE=`ls -l "${MP3}" | awk '{ print $5}'`
+RATIO=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $FLV_SIZE * 100) + 0.5);"`
+echo RATIO=$RATIO
+echo MAX=$MAX
+echo MIN=$MIN
+
+if [ $RETVAL1 -eq 0 -a $RETVAL2 -eq 0 ]; then
+	#if [ $RATIO -le $MAX -a $RATIO -ge $MIN ]; then
+	#	#echo true
+	#	echo "rm ${FLV}"
+		rm "${FLV}"
+	#else
+	#	#echo false
+	#	echo
+	#fi
+fi
 
