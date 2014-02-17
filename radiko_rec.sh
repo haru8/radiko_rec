@@ -2,18 +2,40 @@
 #
 # history
 #
-# Rev	Date		Name	notes
-# 1	2011-3-29	7K3VEY	sanko:	http://yuzuru.2ch.net/test/read.cgi/pc2nanmin/1271066265/343
-#					http://gist.github.com/875864
-# 0	2010-5-2	7K3VEY	first issue.
  
-export PATH=/usr/lib/qt-3.3/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/home/haru/bin
+export PATH=/usr/lib/qt-3.3/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/home/${HOME}/bin
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH
 
 BASE=/home/haru/radiko_rec
+SERVER_NAME='rtmpe://w-radiko.smartstream.ne.jp'
+SERVER_PORT=1935
+PLAYERURL=http://radiko.jp/player/swf/player_3.0.0.01.swf
+PLAYPATH='simul-stream.stream'
+pLAYERFILE="${HOME}/bin/player.swf"
+KEYFILE="${HOME}/bin/authkey.png"
+AUTHFILE1="${HOME}/bin/auth1_fms.$$"
+AUTHFILE2="${HOME}/bin/auth2_fms.$$"
+AUTHFILE1URL=https://radiko.jp/v2/api/auth1_fms
+AUTHFILE2URL=https://radiko.jp/v2/api/auth2_fms
 
-usage(){
+SERVER_NHKR1='rtmpe://netradio-r1-flash.nhk.jp'
+SERVER_NHKR2='rtmpe://netradio-r2-flash.nhk.jp'
+SERVER_NHKFM='rtmpe://netradio-fm-flash.nhk.jp'
+PLAYPATH_NHKR1='NetRadio_R1_flash@63346'
+PLAYPATH_NHKR2='NetRadio_R2_flash@63342'
+PLAYPATH_NHKFM='NetRadio_FM_flash@63343'
+PLAYERURL_NHK=http://www3.nhk.or.jp/netradio/files/swf/rtmpe.swf
+ALLARG="$@"
+ARGC=$#
+
+usage() {
+	local arg
+    echo count = $ARGC
+	for arg in $ALLARG; do
+		echo -n "'$arg' "
+	done
+	echo ""
 	echo "Usage: `basename $0` station time [name]" >&2
 	echo "  station   文化放送     : QRR" >&2
 	echo "            TBSラジオ    : TBS" >&2
@@ -24,13 +46,20 @@ usage(){
 	echo "            J-WAVE       : FMJ" >&2
 	echo "            bayfm78      : BAYFM78" >&2
 	echo "            NACK5        : NACK5" >&2
+	echo "            ラジオ日本   : JORF" >&2
 	echo "            FMヨコハマ   : YFM" >&2
+	echo "            NHK第一放送  : NHKR1" >&2
+	echo "            NHK第二放送  : NHKR2" >&2
+	echo "            NHK FM       : NHKFM" >&2
 	echo "  time      Stop at num seconds into stream" >&2
 	echo "  name      output file name" >&2
 }
 
-station_check(){
-	case "$ST" in
+# 放送局チェック
+#  $1 = 放送局
+station_check() {
+	ISNNHK=0
+	case "$1" in
 		QRR)	STATION='文化放送'		;;
 		TBS)	STATION='TBSラジオ'		;;
 		LFR)	STATION='ニッポン放送'	;;
@@ -40,244 +69,307 @@ station_check(){
 		FMJ)	STATION='J-WAVE'		;;
 		BAYFM78)STATION='bayfm78'		;;
 		NACK5)	STATION='NACK5'			;;
+		JORF)	STATION='ラジオ日本'    ;;
 		YFM)	STATION='FMヨコハマ'	;;
+		NHKR1)	STATION='NHK第一放送'
+				ISNNHK=1
+				SERVER_NAME=$SERVER_NHKR1
+				PLAYPATH=$PLAYPATH_NHKR1
+				PLAYERURL=$PLAYERURL_NHK
+				;;
+		NHKR2)	STATION='NHK第二放送'
+				ISNNHK=1
+				SERVER_NAME=$SERVER_NHKR2
+				PLAYPATH=$PLAYPATH_NHKR2
+				PLAYERURL=$PLAYERURL_NHK
+				;;
+		NHKFM)	STATION='NHK FM'
+				ISNNHK=1
+				SERVER_NAME=$SERVER_NHKFM
+				PLAYPATH=$PLAYPATH_NHKFM
+				PLAYERURL=$PLAYERURL_NHK
+				;;
 		*)		usage
 				exit 1
 				;;
 	esac
 }
 
-time_check(){
-	expr  0 + $STOP>/dev/null 2>&1
+# 録音時間チェック
+#  $1 = 録音時間(秒)
+time_check() {
+	expr  0 + $1 > /dev/null 2>&1
 	if [ $? != 0 ]; then
 		usage
 		exit 2
 	fi
 }
 
-#28時間制の日時を作成。
-H=`date '+%k'`
-declare -i HH
-if [ $H -le 4 ]; then
-	HH=$H+24
-	HHH=`printf '%02d\n' $HH`
-	YMD=`date --date '1 days ago' '+%Y%m%d(%a)'`
-	YEAR=`date --date '1 days ago' '+%Y'`
-	YMD_HMS=`date --date '1 days ago' "+%Y%m%d_$HHH%M%S"`
-	JYMD_HM=`date --date '1 days ago' "+%x $HHH時%M分"`
-else
-	HH="$H"
-	HHH=`printf '%02d\n' $HH`
-	YMD=`date '+%Y%m%d(%a)'`
-	YEAR=`date '+%Y'`
-	YMD_HMS=`date "+%Y%m%d_$HHH%M%S"`
-	JYMD_HM=`date "+%x $HHH時%M分"`
-fi
+# 認証キー取得
+get_auth() {
+	#
+	# get player
+	#
+	if [ ! -s $PLAYERFILE ]; then
+		wget -q -O $PLAYERFILE $PLAYERURL
+	
+		if [ $? -ne 0 ]; then
+			echo "failed get player"
+			exit 1
+		fi
+	fi
+	
+	#
+	# get keydata (need swftools)
+	#
+	if [ ! -s $KEYFILE ]; then
+		swfextract -b 14 $PLAYERFILE -o $KEYFILE
+	
+	  if [ ! -s $KEYFILE ]; then
+		echo "failed get keydata"
+		exit 1
+		fi
+	fi
+	
+	if [ -f $AUTHFILE1 ]; then
+		rm -f $AUTHFILE1
+	fi
+	
+	#
+	# access auth1_fms
+	#
+	wget -q \
+	    --header="pragma: no-cache" \
+	    --header="X-Radiko-App: pc_1" \
+	    --header="X-Radiko-App-Version: 2.0.1" \
+	    --header="X-Radiko-User: test-stream" \
+	    --header="X-Radiko-Device: pc" \
+	    --post-data='\r\n' \
+	    --no-check-certificate \
+	    --save-headers \
+	    -O $AUTHFILE1 \
+	    $AUTHFILE1URL
+	
+	if [ $? -ne 0 ]; then
+		echo "failed auth1 process"
+		exit 1
+	fi
+	
+	#
+	# get partial key
+	#
+	AUTHTOKEN=`cat $AUTHFILE1 | perl -ne 'print $1 if(/x-radiko-authtoken: ([\w-]+)/i)'`
+	local offset=`cat $AUTHFILE1 | perl -ne 'print $1 if(/x-radiko-keyoffset: (\d+)/i)'`
+	local length=`cat $AUTHFILE1 | perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)'`
+	
+	local partialkey=`dd if=$KEYFILE bs=1 skip=${offset} count=${length} 2> /dev/null | base64`
+	
+	echo "authtoken: ${AUTHTOKEN} \noffset: ${offset} length: ${length} \npartialkey: $partialkey"
+	
+	rm -f $AUTHFILE1
+	
+	if [ -f $AUTHFILE2 ]; then
+		rm -f $AUTHFILE2
+	fi
+	
+	#
+	# access auth2_fms
+	#
+	wget -q \
+	     --header="pragma: no-cache" \
+	     --header="X-Radiko-App: pc_1" \
+	     --header="X-Radiko-App-Version: 2.0.1" \
+	     --header="X-Radiko-User: test-stream" \
+	     --header="X-Radiko-Device: pc" \
+	     --header="X-Radiko-Authtoken: ${AUTHTOKEN}" \
+	     --header="X-Radiko-Partialkey: ${partialkey}" \
+	     --post-data='\r\n' \
+	     --no-check-certificate \
+	     -O $AUTHFILE2 \
+	     $AUTHFILE2URL
+	
+	if [ $? -ne 0 -o ! -f $AUTHFILE2 ]; then
+		echo "failed auth2 process"
+		exit 1
+	fi
+	
+	echo "authentication success"
+	
+	areaid=`cat $AUTHFILE2 | perl -ne 'print $1 if(/^([^,]+),/i)'`
+	echo "areaid: $areaid"
+	
+	rm -f $AUTHFILE2
+}
 
-DIR=$BASE/$YMD
-
-# 引数チェック
-if [ $# = 2 ]; then
-	ST=$1
-	station_check
-	STOP=$2
-	time_check
-	NAME=""
-	FILE=$DIR/${YMD_HMS}_${ST}_${STOP}
-elif [ $# = 3 ]; then
-	ST=$1
-	station_check
-	STOP=$2
-	time_check
-	NAME="$3"
-	FILE=$DIR/${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
-else
-	usage
-	exit 3
-fi
-declare -i REC_MIN=$STOP/60
-FLV="${FILE}.flv"
-MP3="${FILE}.mp3"
-
-mkdir -p "${DIR}"
-
-rec_time=10  # sec
-file_prefix=$1
-##file_prefix=joqr
-file_suffix=`date +%Y-%m-%d-%H%M`
-#file_name=$file_prefix-$file_suffix
-
-server_name=radiko.smartstream.ne.jp
-#server_name=7k3vey-macromedia-fcs.ham-radio-op.net # for cyukei but old
-#server_name=localhost  # for test
-server_port=1935
-
-echo YMD : $YMD
-echo DIR : $DIR
-echo FLV : $FLV
-echo MP3 : $MP3
-#exit
-
-playerurl=http://radiko.jp/player/swf/player_2.0.1.00.swf
-playerfile="${HOME}/bin/player.swf"
-keyfile="${HOME}/bin/authkey.png"
-authfile="${HOME}/bin/auth1_fms.$$"
-authfile2="${HOME}/bin/auth2_fms.$$"
-
-channel=$1
-if [ $# -eq 1 ]; then
-  output="${FLV}"
-elif [ $# -eq 2 ]; then
-  rec_time=$2
-  output="${FLV}"
-elif [ $# -eq 3 ]; then
-  rec_time=$2
-  output=$3
-else
-  echo "usage : $0 channel_name [rectime(sec)] [outputfile]"
-  exit 1
-fi
-
-#
-# get player
-#
-if [ ! -f $playerfile ]; then
-wget -q -O $playerfile $playerurl
-
-  if [ $? -ne 0 ]; then
-echo "failed get player"
-    exit 1
-  fi
-fi
-
-#
-# get keydata (need swftools)
-#
-if [ ! -f $keyfile ]; then
-swfextract -b 5 $playerfile -o $keyfile
-
-  if [ ! -f $keyfile ]; then
-echo "failed get keydata"
-    exit 1
-  fi
-fi
-
-if [ -f $authfile ]; then
-rm -f $authfile
-fi
-
-#
-# access auth1_fms
-#
-wget -q \
-     --header="pragma: no-cache" \
-     --header="X-Radiko-App: pc_1" \
-     --header="X-Radiko-App-Version: 2.0.1" \
-     --header="X-Radiko-User: test-stream" \
-     --header="X-Radiko-Device: pc" \
-     --post-data='\r\n' \
-     --no-check-certificate \
-     --save-headers \
-     -O $authfile \
-     https://radiko.jp/v2/api/auth1_fms
-
-if [ $? -ne 0 ]; then
-echo "failed auth1 process"
-  exit 1
-fi
-
-#
-# get partial key
-#
-authtoken=`cat $authfile | perl -ne 'print $1 if(/x-radiko-authtoken: ([\w-]+)/i)'`
-offset=`cat $authfile | perl -ne 'print $1 if(/x-radiko-keyoffset: (\d+)/i)'`
-length=`cat $authfile | perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)'`
-
-partialkey=`dd if=$keyfile bs=1 skip=${offset} count=${length} 2> /dev/null | base64`
-
-echo "authtoken: ${authtoken} \noffset: ${offset} length: ${length} \npartialkey: $partialkey"
-
-rm -f $authfile
-
-if [ -f $authfile2 ]; then
-rm -f $authfile2
-fi
-
-#
-# access auth2_fms
-#
-wget -q \
-     --header="pragma: no-cache" \
-     --header="X-Radiko-App: pc_1" \
-     --header="X-Radiko-App-Version: 2.0.1" \
-     --header="X-Radiko-User: test-stream" \
-     --header="X-Radiko-Device: pc" \
-     --header="X-Radiko-Authtoken: ${authtoken}" \
-     --header="X-Radiko-Partialkey: ${partialkey}" \
-     --post-data='\r\n' \
-     --no-check-certificate \
-     -O $authfile2 \
-     https://radiko.jp/v2/api/auth2_fms
-
-if [ $? -ne 0 -o ! -f $authfile2 ]; then
-echo "failed auth2 process"
-  exit 1
-fi
-
-echo "authentication success"
-
-areaid=`cat $authfile2 | perl -ne 'print $1 if(/^([^,]+),/i)'`
-echo "areaid: $areaid"
-
-rm -f $authfile2
 
 #
 # rtmpdump
-#
-rtmpdump -v \
-	 --stop $rec_time \
-         -r "rtmpe://$server_name:$server_port" \
-         --playpath "simul-stream" \
-         --app "${channel}/_defInst_" \
-         -W $playerurl \
-         -C S:"" -C S:"" -C S:"" -C S:$authtoken \
-         --live \
-         --flv "${FLV}"
+#  $1 
+#  $2 
+#  $3 
+rec() {
+	local station=$1
+	local rec_time=$2
+	local filename="$3"
 
-RETVAL1=$?
-#if [ $RETVAL != 0 ]; then
-#	exit 1
-#fi
+	if [ $ISNNHK = 0 ]; then
+		rtmpdump -v \
+		    -r "$SERVER_NAME" \
+		    --playpath $PLAYPATH \
+		    --app "${station}/_definst_" \
+		    -W $PLAYERURL \
+		    -C S:"" -C S:"" -C S:"" -C S:$AUTHTOKEN \
+		    --live \
+		    --stop $rec_time \
+		    -m 30 \
+		    -o "${filename}"
+		RET=$?
+	else
+		rtmpdump -v \
+		    -r "$SERVER_NAME" \
+		    --playpath $PLAYPATH \
+		    --app "live" \
+		    -W $PLAYERURL \
+		    --live \
+		    --stop $rec_time \
+		    -m 30 \
+		    -o "${filename}"
+		RET=$?
+	fi
+	return $RET
+}
+
+# 28時間制の日時を作成。
+create_28date() {
+	local -i h=`date '+%k'`
+	local -i hh
+	local -i hhh
+	if [ $h -le 4 ]; then
+		hh=$h+24
+		hhh=`printf '%02d\n' $hh`
+		YMD=`date --date '1 days ago' '+%Y%m%d(%a)'`
+		YEAR=`date --date '1 days ago' '+%Y'`
+		YMD_HMS=`date --date '1 days ago' "+%Y%m%d_$hhh%M%S"`
+		JYMD_HM=`date --date '1 days ago' "+%x $hhh時%M分"`
+	else
+		hh="$h"
+		hhh=`printf '%02d\n' $hh`
+		YMD=`date '+%Y%m%d(%a)'`
+		YEAR=`date '+%Y'`
+		YMD_HMS=`date "+%Y%m%d_$hhh%M%S"`
+		JYMD_HM=`date "+%x $hhh時%M分"`
+	fi
+}
+
+# 録音ファイル名を作成
+create_filename() {
+	create_28date
+
+	# 保存ディレクトリ
+	DIR=$BASE/$YMD
+
+	# 引数チェック
+	ST=$1
+	station_check "$ST"
+	STOP=$2
+	time_check $STOP
+
+	if [ $# = 2 ]; then
+		# ファイル名指定なし
+		NAME=""
+		FILE=$DIR/${YMD_HMS}_${ST}_${STOP}
+	elif [ $# = 3 ]; then
+		# ファイル名指定有り
+		NAME="$3"
+		FILE=$DIR/${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
+	else
+		usage
+		exit 3
+	fi
+
+	if [ ! -d "${DIR}" ]; then
+		mkdir -p "${DIR}"
+	fi
+
+	REC_MIN=$STOP/60
+	FLV="${FILE}.flv"
+	MP3="${FILE}.mp3"
+	
+	echo YMD : $YMD
+	echo DIR : $DIR
+	echo FLV : $FLV
+	echo MP3 : $MP3
+}
+
+declare -i REC_MIN
+create_filename "$@"
+
+# 録音実施
+declare -i REC_CNT=1
+declare -i REC_MAX=10
+RETVAL1=10
+#while [ ! -s "${FLV}" -a $RETVAL1 != 0 ]; do
+while [ $RETVAL1 != 0 ]; do
+	echo -n rec start : 
+	date
+	create_filename "$@"
+    echo "REC_CNT = $REC_CNT"
+	if [ $ISNNHK = 0 ]; then
+		get_auth
+	fi
+	rec $ST $STOP "${FLV}"
+	RETVAL1=$?
+	echo "rec RETVAL1 = $RETVAL1"
+    REC_CNT=$REC_CNT+1
+	if [ $REC_CNT -gt $REC_MAX ]; then
+		exit 1
+	fi
+done
 
 #
 # ffmpeg flv->mp3
 #
+echo -n ffmpeg start : 
 date
-/usr/local/bin/ffmpeg -y -i "${FLV}" -acodec libmp3lame -aq 9 "${MP3}"
+#/usr/local/bin/ffmpeg -y -i "${FLV}" -acodec libmp3lame -aq 9 "${MP3}"
+/usr/local/bin/ffmpeg \
+  -metadata author="${STATION}" \
+  -metadata artist="${STATION}" \
+  -metadata title="${NAME} ${JYMD_HM}～ ${REC_MIN}分" \
+  -metadata album="${NAME}" \
+  -metadata genre='ラジオ' \
+  -metadata year="${YEAR}" \
+  -metadata comment="${NAME}(${STATION}) ${JYMD_HM}～ ${REC_MIN}分" \
+  -y -i "${FLV}" -acodec libmp3lame "${MP3}"
+
 RETVAL2=$?
+echo "ffmpeg RETVAL2 = $RETVAL2"
+echo -n ffmpeg end   : 
 date
 
-#if [ $RETVAL != 0 ]; then
-#	exit 2
-#fi
+if [ $RETVAL1 != 0 ]; then
+	exit 2
+fi
 
-MAX='130'
-MIN='120'
+MAX='133'
+MIN='123'
 FLV_SIZE=`ls -l "${FLV}" | awk '{ print $5}'`
 MP3_SIZE=`ls -l "${MP3}" | awk '{ print $5}'`
 RATIO=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $FLV_SIZE * 100) + 0.5);"`
-echo RATIO=$RATIO
-echo MAX=$MAX
-echo MIN=$MIN
+echo RATIO=$RATIO  FLV_SIZE=$FLV_SIZE  MP3_SIZE=$MP3_SIZE
+echo MAX=$MAX  MIN=$MIN
 
 if [ $RETVAL1 -eq 0 -a $RETVAL2 -eq 0 ]; then
-	#if [ $RATIO -le $MAX -a $RATIO -ge $MIN ]; then
-	#	#echo true
-	#	echo "rm ${FLV}"
+	if [ $RATIO -le $MAX -a $RATIO -ge $MIN ]; then
+		#echo true
+		echo "rm ${FLV}"
 		rm "${FLV}"
-	#else
-	#	#echo false
-	#	echo
-	#fi
+	else
+		#echo false
+		echo "rm skip."
+	fi
 fi
+
+
+#vim: ts=4:sw=4
 
