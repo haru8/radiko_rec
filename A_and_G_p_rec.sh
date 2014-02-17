@@ -64,7 +64,7 @@ rec() {
 
 # 28時間制の日時を作成。
 create_28date() {
-    NOW_DATE=`date '+%Y/%m/%d %H:%M:%S'`
+	NOW_DATE=`date '+%Y/%m/%d %H:%M:%S'`
 	local -i h=`date -d "$NOW_DATE" '+%k'`
 	local -i hh
 	local -i hhh
@@ -84,13 +84,13 @@ create_28date() {
 		JYMD_HM=`date -d "$NOW_DATE" "+%x $hhh時%M分%S秒"`
 	fi
 
-    #echo 'h      : ' $h
-    #echo 'hh     : ' $hh
-    #echo 'hhh    : ' $hhh
-    #echo 'YMD    : ' $YMD
-    #echo 'YEAR   : ' $YEAR
-    #echo 'YMD_HMS: ' $YMD_HMS
-    #echo 'JYMD_HM: ' $JYMD_HM
+	#echo 'h      : ' $h
+	#echo 'hh     : ' $hh
+	#echo 'hhh    : ' $hhh
+	#echo 'YMD    : ' $YMD
+	#echo 'YEAR   : ' $YEAR
+	#echo 'YMD_HMS: ' $YMD_HMS
+	#echo 'JYMD_HM: ' $JYMD_HM
 }
 
 # 録音ファイル名を作成
@@ -102,11 +102,11 @@ create_filename() {
 
 	# 引数チェック
 	STOP=$1
-    STATION="超!A&G+"
-    local -i run_s=`date -d "$RUN_DATE" '+%s'`
-    local -i now_s=`date -d "$NOW_DATE" '+%s'`
-    local -i delay=$now_s-$run_s
-    STOP=$STOP-$delay+5
+	STATION="超!A&G+"
+	local -i run_s=`date -d "$RUN_DATE" '+%s'`
+	local -i now_s=`date -d "$NOW_DATE" '+%s'`
+	local -i delay=$now_s-$run_s
+	STOP=$STOP-$delay+5
 	time_check $STOP
 
 	if [ $# = 1 ]; then

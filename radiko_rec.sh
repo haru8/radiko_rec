@@ -34,7 +34,7 @@ NOW_DATE=`date '+%Y/%m/%d %H:%M:%S'`
 
 usage() {
 	local arg
-    echo count = $ARGC
+	echo count = $ARGC
 	for arg in $ALLARG; do
 		echo -n "'$arg' "
 	done
@@ -207,7 +207,7 @@ get_auth() {
 	
 	areaid=`cat $AUTHFILE2 | perl -ne 'print $1 if(/^([^,]+),/i)'`
 	echo "areaid: $areaid"
-    echo ''
+	echo ''
 	
 	rm -f $AUTHFILE2
 }
@@ -252,7 +252,7 @@ rec() {
 
 # 28時間制の日時を作成。
 create_28date() {
-    NOW_DATE=`date '+%Y/%m/%d %H:%M:%S'`
+	NOW_DATE=`date '+%Y/%m/%d %H:%M:%S'`
 	local -i h=`date -d "$NOW_DATE" '+%k'`
 	local -i hh
 	local hhh
@@ -272,13 +272,13 @@ create_28date() {
 		JYMD_HM=`date -d "$NOW_DATE" "+%x $hhh時%M分%S秒"`
 	fi
 
-    #echo 'h      : ' $h
-    #echo 'hh     : ' $hh
-    #echo 'hhh    : ' $hhh
-    #echo 'YMD    : ' $YMD
-    #echo 'YEAR   : ' $YEAR
-    #echo 'YMD_HMS: ' $YMD_HMS
-    #echo 'JYMD_HM: ' $JYMD_HM
+	#echo 'h      : ' $h
+	#echo 'hh     : ' $hh
+	#echo 'hhh    : ' $hhh
+	#echo 'YMD    : ' $YMD
+	#echo 'YEAR   : ' $YEAR
+	#echo 'YMD_HMS: ' $YMD_HMS
+	#echo 'JYMD_HM: ' $JYMD_HM
 }
 
 # 録音ファイル名を作成
@@ -292,10 +292,10 @@ create_filename() {
 	ST=$1
 	station_check "$ST"
 	STOP=$2
-    local -i run_s=`date -d "$RUN_DATE" '+%s'`
-    local -i now_s=`date -d "$NOW_DATE" '+%s'`
-    local -i delay=$now_s-$run_s
-    STOP=$STOP-$delay+5
+	local -i run_s=`date -d "$RUN_DATE" '+%s'`
+	local -i now_s=`date -d "$NOW_DATE" '+%s'`
+	local -i delay=$now_s-$run_s
+	STOP=$STOP-$delay+5
 	time_check $STOP
 
 	if [ $# = 2 ]; then
@@ -316,15 +316,15 @@ create_filename() {
 	fi
 
 	REC_MIN=$STOP/60
-    REC_SEC="$STOP-($REC_MIN*60)"
+	REC_SEC="$STOP-($REC_MIN*60)"
 	FLV="${FILE}.flv"
 	MP3="${FILE}.mp3"
 	
-    echo 'now date :' $RUN_DATE
-    #echo 'run_s    :' $run_s
-    #echo 'now_s    :' $now_s
-    echo 'delay    :' $delay
-    echo 'STOP     :' $STOP
+	echo 'now date :' $RUN_DATE
+	#echo 'run_s    :' $run_s
+	#echo 'now_s    :' $now_s
+	echo 'delay    :' $delay
+	echo 'STOP     :' $STOP
 	echo 'YMD      :' $YMD
 	echo 'DIR      :' $DIR
 	echo 'FLV      :' $FLV
@@ -348,7 +348,7 @@ while [ $RETVAL1 != 0 ]; do
 	echo -n rec start : 
 	date
 	create_filename "$@"
-    echo "REC_CNT = $REC_CNT"
+	echo "REC_CNT = $REC_CNT"
 	echo ''
 	if [ $ISNHK = 0 ]; then
 		get_auth
@@ -357,7 +357,7 @@ while [ $RETVAL1 != 0 ]; do
 	RETVAL1=$?
 	echo "rec RETVAL1 = $RETVAL1"
 	echo ''
-    REC_CNT=$REC_CNT+1
+	REC_CNT=$REC_CNT+1
 	if [ $REC_CNT -gt $REC_MAX ]; then
 		exit 1
 	fi
