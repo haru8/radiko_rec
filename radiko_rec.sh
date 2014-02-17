@@ -83,8 +83,6 @@ else
 	exit 3
 fi
 declare -i REC_MIN=$STOP/60
-FLV="${FILE}.flv"
-MP3="${FILE}.mp3"
 
 
 mkdir -p "$DIR"
@@ -93,40 +91,13 @@ rtmpdump --stop $STOP \
 --rtmp "rtmpe://radiko.smartstream.ne.jp" \
 --playpath "simul-stream" \
 --app "$ST/_defInst_" \
---flashVer "5CR&VT'B8i" \
+--flashVer "WIN 10,0,45,2" \
 --live \
---flv "${FLV}"
+--flv "${FILE}.flv"
 
-RETVAL=$?
-if [ $RETVAL != 0 ]; then
-	exit 1
-fi
-
-ffmpeg -i "${FLV}" \
+ffmpeg -i "${FILE}.flv" \
 -vn -acodec libmp3lame -ab 48k \
-"${MP3}"
-
-RETVAL=$?
-if [ $RETVAL != 0 ]; then
-	exit 2
-fi
-
-MAX='100'
-MIN='90'
-FLV_SIZE=`ls -l "${FLV}" | awk '{ print $5}'`
-MP3_SIZE=`ls -l "${MP3}" | awk '{ print $5}'`
-RATIO=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $FLV_SIZE * 100) + 0.5);"`
-echo RATIO=$RATIO
-echo MAX=$MAX
-echo MIN=$MIN
-
-if [ $RATIO -le $MAX -a $RATIO -ge $MIN ]; then
-	rm "${FLV}"
-#	echo true
-else
-	echo
-	#echo false
-fi
+"${FILE}.mp3"
 
 
 #eyeD3 \
@@ -134,7 +105,7 @@ fi
 #--title="$NAME" \
 #--year="$YEAR"  \
 #--comment="jpn:date:${JYMD_HM}～${REC_MIN}分" \
-#"${MP3}"
+#"${FILE}.mp3"
 
 #mp3gain "$DIR/${YMD_HMS}_${ST}_${STOP}.mp3"
 #TMPFILE=`mktemp`
