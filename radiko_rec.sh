@@ -296,6 +296,7 @@ create_filename() {
 	local -i now_s=`date -d "$NOW_DATE" '+%s'`
 	local -i delay=$now_s-$run_s
 	STOP=$STOP-$delay+5
+	STOP=`echo $STOP | sed 's/-//g'`
 	time_check $STOP
 
 	if [ $# = 2 ]; then
@@ -316,7 +317,7 @@ create_filename() {
 	fi
 
 	REC_MIN=$STOP/60
-	REC_SEC="$STOP-($REC_MIN*60)"
+    REC_SEC="$STOP-($REC_MIN*60)"
 	FLV="${FILE}.flv"
 	MP3="${FILE}.mp3"
 	
@@ -341,14 +342,14 @@ create_filename "$@"
 
 # 録音実施
 declare -i REC_CNT=1
-declare -i REC_MAX=10
+declare -i REC_MAX=20
 RETVAL1=10
 #while [ ! -s "${FLV}" -a $RETVAL1 != 0 ]; do
 while [ $RETVAL1 != 0 ]; do
 	echo -n rec start : 
 	date
 	create_filename "$@"
-	echo "REC_CNT = $REC_CNT"
+    echo "REC_CNT = $REC_CNT"
 	echo ''
 	if [ $ISNHK = 0 ]; then
 		get_auth
