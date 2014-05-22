@@ -130,6 +130,7 @@ create_filename() {
     REC_SEC="$STOP-($REC_MIN*60)"
 	FLV="${FILE}.flv"
 	MP4="${FILE}.mp4"
+	M4A="${FILE}.m4a"
 	MP3="${FILE}.mp3"
 	
 	echo 'now date :' $RUN_DATE
@@ -141,6 +142,7 @@ create_filename() {
 	echo 'DIR      :' $DIR
 	echo 'FLV      :' $FLV
 	echo 'MP4      :' $MP4
+	echo 'M4A      :' $M4A
 	echo 'MP3      :' $MP3
 	echo ''
 }
@@ -193,18 +195,53 @@ echo ''
 #
 # ffmpeg flv->mp3
 #
-echo -n 'ffmpeg flv->mp3 start : '
+#echo -n 'ffmpeg flv->mp3 start : '
+#date
+#/usr/local/bin/ffmpeg \
+#  -y -i "${FLV}" \
+#  -ab 96 -ar 22050 -acodec libmp3lame \
+#  "${MP3}"
+#
+#RETVAL3=$?
+#echo "ffmpeg RETVAL3 = $RETVAL3"
+#echo -n 'ffmpeg flv->mp3 end   : '
+#date
+#echo ''
+
+#
+# ffmpeg flv->m4a
+#
+echo -n 'ffmpeg flv->m4a start : '
 date
 /usr/local/bin/ffmpeg \
   -y -i "${FLV}" \
-  -ab 96 -ar 22050 -acodec libmp3lame \
-  "${MP3}"
+  -vn -acodec copy \
+  "${M4A}"
 
 RETVAL3=$?
 echo "ffmpeg RETVAL3 = $RETVAL3"
-echo -n 'ffmpeg flv->mp3 end   : '
+echo -n 'ffmpeg flv->m4a end   : '
 date
 echo ''
+
+#
+# ffmpeg m4a->mp3
+#
+if [ $RETVAL3 = 0 ]; then
+	echo -n 'ffmpeg m4a->mp3 start : '
+	date
+	/usr/local/bin/ffmpeg \
+	  -y -i "${M4A}" \
+	  -vn -ab 96 -ar 22050  -acodec libmp3lame \
+	  "${MP3}"
+	
+	RETVAL4=$?
+	echo "ffmpeg RETVAL4 = $RETVAL4"
+	echo -n 'ffmpeg m4a->mp3 end   : '
+	date
+	echo ''
+	rm "${M4A}"
+fi
 
 
 if [ $RETVAL1 != 0 ]; then
