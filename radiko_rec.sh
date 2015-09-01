@@ -2,13 +2,17 @@
 #
 # history
 #
+
+# 配信サーバーはxmlから取るようにしたい。
+# http://radiko.jp/v2/station/stream/QRR.xml
+# http://radiko.jp/v2/station/stream_multi/QRR.xml
  
 export PATH=/usr/lib/qt-3.3/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/home/${HOME}/bin
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH
 
 BASE=/home/haru/radiko_rec
-SERVER_NAME='rtmpe://w-radiko.smartstream.ne.jp'
+SERVER_NAME='rtmpe://f-radiko.smartstream.ne.jp'
 SERVER_PORT=1935
 PLAYERURL=http://radiko.jp/player/swf/player_3.0.0.01.swf
 PLAYPATH='simul-stream.stream'
@@ -396,7 +400,7 @@ if [ $RETVAL1 != 0 ]; then
 fi
 
 MAX='120'
-MIN='75'
+MIN='70'
 FLV_SIZE=`ls -l "${FLV}" | awk '{ print $5}'`
 MP3_SIZE=`ls -l "${MP3}" | awk '{ print $5}'`
 RATIO=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $FLV_SIZE * 100) + 0.5);"`

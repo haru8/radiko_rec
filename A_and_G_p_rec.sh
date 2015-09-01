@@ -7,8 +7,14 @@ export PATH=/usr/lib/qt-3.3/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH
 
-SERVER_NAME1="rtmp://fms-base1.mitene.ad.jp/agqr/aandg2"
-SERVER_NAME2="rtmp://fms-base2.mitene.ad.jp/agqr/aandg2"
+#SERVER_NAME1="rtmp://fms-base1.mitene.ad.jp/agqr/aandg2"
+#SERVER_NAME2="rtmp://fms-base2.mitene.ad.jp/agqr/aandg2"
+#SERVER_NAME1="rtmp://fms-base1.mitene.ad.jp/agqr/aandg11"
+#SERVER_NAME2="rtmp://fms-base2.mitene.ad.jp/agqr/aandg11"
+SERVER_NAME1="rtmp://fms-base1.mitene.ad.jp/agqr/"
+SERVER_NAME2="rtmp://fms-base2.mitene.ad.jp/agqr/"
+PLAYPATH1="aandg22"
+PLAYPATH2="aandg111"
 BASE=/home/haru/radiko_rec
 ALLARG="$@"
 RUN_DATE=`date '+%Y/%m/%d %H:%M:%S'`
@@ -43,13 +49,21 @@ time_check() {
 rec() {
 	local rec_time=$1
 	local filename="$2"
-	local -i num=$RANDOM%2+1
+	local -i snum=$RANDOM%2+1
+	local -i pnum=$RANDOM%2+1
 
-	if [ $num -eq 1 ]; then
+	if [ $snum -eq 1 ]; then
 		SERVER_NAME=$SERVER_NAME1
 	else
 		SERVER_NAME=$SERVER_NAME2
 	fi
+
+	if [ $pnum -eq 1 ]; then
+		PLAYPATH=$PLAYPATH1
+	else
+		PLAYPATH=$PLAYPATH2
+	fi
+	SERVER_NAME="${SERVER_NAME}${PLAYPATH}"
 	echo $SERVER_NAME
 
 	rtmpdump -v \
@@ -58,6 +72,14 @@ rec() {
 	    --stop $rec_time \
 	    -m 30 \
 	    -o "${filename}"
+	#rtmpdump -v \
+	#    --rtmp     "rtmpe://fms2.uniqueradio.jp/" \
+    #    --playpath "aandg22" \
+    #    --app      "?rtmp://fms-base1.mitene.ad.jp/agqr/" \
+	#    --live \
+	#    --stop $rec_time \
+	#    -m 30 \
+	#    -o "${filename}"
 	RET=$?
 	return $RET
 }
