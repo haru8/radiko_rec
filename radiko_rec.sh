@@ -373,7 +373,6 @@ done
 #
 echo -n ffmpeg start : 
 date
-#/usr/local/bin/ffmpeg -y -i "${FLV}" -acodec libmp3lame -aq 9 "${MP3}"
 /usr/local/bin/ffmpeg \
   -y -i "${FLV}" \
   -metadata StreamTitle="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
