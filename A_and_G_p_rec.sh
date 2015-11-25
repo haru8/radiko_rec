@@ -70,7 +70,7 @@ rec() {
 	    -r "${SERVER_NAME}" \
 	    --live \
 	    --stop $rec_time \
-	    -m 30 \
+	    -m 10 \
 	    -o "${filename}"
 	#rtmpdump -v \
 	#    --rtmp     "rtmpe://fms2.uniqueradio.jp/" \
@@ -178,7 +178,7 @@ create_filename "$@"
 
 # 録音実施
 declare -i REC_CNT=1
-declare -i REC_MAX=10
+declare -i REC_MAX=30
 RETVAL1=10
 #while [ ! -s "${FLV}" -a $RETVAL1 != 0 ]; do
 while [ $RETVAL1 != 0 ]; do
