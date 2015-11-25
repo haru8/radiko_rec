@@ -44,23 +44,24 @@ usage() {
 	done
 	echo ""
 	echo "Usage: `basename $0` station time [name]" >&2
-	echo "  station   文化放送     : QRR" >&2
-	echo "            TBSラジオ    : TBS" >&2
-	echo "            ニッポン放送 : LFR" >&2
-	echo "            ラジオNIKKEI : NSB" >&2
-	echo "            TOKYO FM     : FMT" >&2
-	echo "            InterFM      : INT" >&2
-	echo "            J-WAVE       : FMJ" >&2
-	echo "            bayfm78      : BAYFM78" >&2
-	echo "            NACK5        : NACK5" >&2
-	echo "            ラジオ日本   : JORF" >&2
-	echo "            FMヨコハマ   : YFM" >&2
-	echo "            東海ラジオ   : TOKAIRADIO" >&2
+	echo "  station   文化放送        : QRR" >&2
+	echo "            TBSラジオ       : TBS" >&2
+	echo "            ニッポン放送    : LFR" >&2
+	echo "            ラジオNIKKEI第1 : RN1" >&2
+	echo "            ラジオNIKKEI第2 : RN2" >&2
+	echo "            TOKYO FM        : FMT" >&2
+	echo "            InterFM         : INT" >&2
+	echo "            J-WAVE          : FMJ" >&2
+	echo "            bayfm78         : BAYFM78" >&2
+	echo "            NACK5           : NACK5" >&2
+	echo "            ラジオ日本      : JORF" >&2
+	echo "            FMヨコハマ      : YFM" >&2
+	echo "            東海ラジオ      : TOKAIRADIO" >&2
 	echo "            レディオキューブFM三重 : FMMIE" >&2
-	echo "            CBCラジオ    : CBC" >&2
-	echo "            NHK第一放送  : NHKR1" >&2
-	echo "            NHK第二放送  : NHKR2" >&2
-	echo "            NHK FM       : NHKFM" >&2
+	echo "            CBCラジオ       : CBC" >&2
+	echo "            NHK第一放送     : NHKR1" >&2
+	echo "            NHK第二放送     : NHKR2" >&2
+	echo "            NHK FM          : NHKFM" >&2
 	echo "  time      Stop at num seconds into stream" >&2
 	echo "  name      output file name" >&2
 }
@@ -74,17 +75,18 @@ station_check() {
 		QRR)	STATION='文化放送'		;;
 		TBS)	STATION='TBSラジオ'		;;
 		LFR)	STATION='ニッポン放送'	;;
-		NSB)	STATION='ラジオNIKKEI'	;;
+		RN1)	STATION='ラジオNIKKEI第1'	;;
+		RN2)	STATION='ラジオNIKKEI第2'	;;
 		FMT)	STATION='TOKYO FM'		;;
 		INT)	STATION='InterFM'		;;
 		FMJ)	STATION='J-WAVE'		;;
 		BAYFM78)STATION='bayfm78'		;;
 		NACK5)	STATION='NACK5'			;;
-		JORF)	STATION='ラジオ日本'    ;;
+		JORF)	STATION='ラジオ日本'	;;
 		YFM)	STATION='FMヨコハマ'	;;
-		TOKAIRADIO) STATION='東海ラジオ' ;;
+		TOKAIRADIO) STATION='東海ラジオ';;
 		FMMIE)	STATION='レディオキューブFM三重' ;;
-		CBC)	STATION='CBCラジオ' ;;
+		CBC)	STATION='CBCラジオ'		;;
 		NHKR1)	STATION='NHK第一放送'
 				ISNHK=1
 				SERVER_NAME=$SERVER_NHKR1
@@ -236,7 +238,7 @@ rec() {
 		    -C S:"" -C S:"" -C S:"" -C S:$AUTHTOKEN \
 		    --live \
 		    --stop $rec_time \
-		    -m 30 \
+		    -m 10 \
 		    -o "${filename}"
 		RET=$?
 	else
@@ -247,7 +249,7 @@ rec() {
 		    -W $PLAYERURL \
 		    --live \
 		    --stop $rec_time \
-		    -m 30 \
+		    -m 10 \
 		    -o "${filename}"
 		RET=$?
 	fi
@@ -346,7 +348,7 @@ create_filename "$@"
 
 # 録音実施
 declare -i REC_CNT=1
-declare -i REC_MAX=20
+declare -i REC_MAX=30
 RETVAL1=10
 #while [ ! -s "${FLV}" -a $RETVAL1 != 0 ]; do
 while [ $RETVAL1 != 0 ]; do
@@ -367,6 +369,9 @@ while [ $RETVAL1 != 0 ]; do
 		exit 1
 	fi
 done
+
+# 容量0のファイルを削除
+find $DIR -type f -size 1 -print0 | xargs -0 rm
 
 #
 # ffmpeg flv->mp3
