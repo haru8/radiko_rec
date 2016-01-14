@@ -288,7 +288,7 @@ if [ $RETVAL1 -eq 0 -a $RETVAL2 -eq 0 ]; then
 		echo "rm skip."
 	fi
 fi
-
+find $BASE -type f -size 0 -print0 | xargs -0 rm
 
 #vim: ts=4:sw=4
 
