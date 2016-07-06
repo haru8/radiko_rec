@@ -151,9 +151,13 @@ create_filename() {
 	REC_MIN=$STOP/60
     REC_SEC="$STOP-($REC_MIN*60)"
 	FLV="${FILE}.flv"
+	FLVS+=("$FLV")
 	MP4="${FILE}.mp4"
+	MP4S+=("$MP4")
 	M4A="${FILE}.m4a"
+	M4AS+=("$M4A")
 	MP3="${FILE}.mp3"
+	MP3S+=("$MP3")
 	
 	echo 'now date :' $RUN_DATE
 	#echo 'run_s    :' $run_s
@@ -174,13 +178,12 @@ echo run date : $RUN_DATE
 declare -i REC_MIN
 declare -i REC_SEC
 declare -i STOP
-create_filename "$@"
 
 # 録音実施
 declare -i REC_CNT=1
 declare -i REC_MAX=30
 RETVAL1=10
-#while [ ! -s "${FLV}" -a $RETVAL1 != 0 ]; do
+#while [ ! -s "$FLV" -a $RETVAL1 != 0 ]; do
 while [ $RETVAL1 != 0 ]; do
 	echo -n rec start : 
 	date
@@ -188,107 +191,117 @@ while [ $RETVAL1 != 0 ]; do
     echo "REC_CNT = $REC_CNT"
 	echo ''
 
-	rec $STOP "${FLV}"
+	rec $STOP "$FLV"
 	RETVAL1=$?
 	echo "rec RETVAL1 = $RETVAL1"
 	echo ''
     REC_CNT=$REC_CNT+1
 	if [ $REC_CNT -gt $REC_MAX ]; then
-		exit 1
+		break
 	fi
 done
 
-#
-# ffmpeg flv->mp4
-#
-echo -n 'ffmpeg flv->mp4 start : '
-date
-/usr/local/bin/ffmpeg \
-  -y -i "${FLV}" \
-  -vcodec copy -acodec copy \
-  "${MP4}"
+# 容量0のファイルを削除
+find $BASE/ -type f -size 0 -print0 -exec rm {} \;
 
-RETVAL2=$?
-echo "ffmpeg RETVAL2 = $RETVAL2"
-echo -n 'ffmpeg flv->mp4 end   : '
-date
-echo ''
+declare -i LOOP_MAX="${#FLVS[@]}"
+declare -i LOOP_CNT=0
+MAX='101'
+MIN='97'
+echo LOOP_MAX=$LOOP_MAX
+while [ $LOOP_CNT -lt $LOOP_MAX ]; do
+	echo LOOP_CNT=$LOOP_CNT
 
-#
-# ffmpeg flv->mp3
-#
-#echo -n 'ffmpeg flv->mp3 start : '
-#date
-#/usr/local/bin/ffmpeg \
-#  -y -i "${FLV}" \
-#  -ab 96 -ar 22050 -acodec libmp3lame \
-#  "${MP3}"
-#
-#RETVAL3=$?
-#echo "ffmpeg RETVAL3 = $RETVAL3"
-#echo -n 'ffmpeg flv->mp3 end   : '
-#date
-#echo ''
+	FLVFILE="${FLVS[$LOOP_CNT]}"
+	MP4FILE="${MP4S[$LOOP_CNT]}"
+	M4AFILE="${M4AS[$LOOP_CNT]}"
+	MP3FILE="${MP3S[$LOOP_CNT]}"
+	echo "$FLVFILE"
+	echo "$MP4FILE"
+	echo "$M4AFILE"
+	echo "$MP3FILE"
 
-#
-# ffmpeg flv->m4a
-#
-echo -n 'ffmpeg flv->m4a start : '
-date
-/usr/local/bin/ffmpeg \
-  -y -i "${FLV}" \
-  -vn -acodec copy \
-  "${M4A}"
+	if [ -f "$FLVFILE" ]; then
+		# ffmpeg flv->mp4
+		echo -n 'ffmpeg flv->mp4 start : '
+		date
+		/usr/local/bin/ffmpeg \
+		  -y -i "$FLVFILE" \
+		  -vcodec copy -acodec copy \
+		  "$MP4FILE"
+		
+		RETVAL2=$?
+		echo "ffmpeg RETVAL2 = $RETVAL2"
+		echo -n 'ffmpeg flv->mp4 end   : '
+		date
+		echo ''
 
-RETVAL3=$?
-echo "ffmpeg RETVAL3 = $RETVAL3"
-echo -n 'ffmpeg flv->m4a end   : '
-date
-echo ''
+		# ffmpeg flv->mp3
+		#echo -n 'ffmpeg flv->mp3 start : '
+		#date
+		#/usr/local/bin/ffmpeg \
+		#  -y -i "$FLVFILE" \
+		#  -ab 96 -ar 22050 -acodec libmp3lame \
+		#  "$MP3FILE"
+		#
+		#RETVAL3=$?
+		#echo "ffmpeg RETVAL3 = $RETVAL3"
+		#echo -n 'ffmpeg flv->mp3 end   : '
+		#date
+		#echo ''
 
-#
-# ffmpeg m4a->mp3
-#
-if [ $RETVAL3 = 0 ]; then
-	echo -n 'ffmpeg m4a->mp3 start : '
-	date
-	/usr/local/bin/ffmpeg \
-	  -y -i "${M4A}" \
-	  -vn -ab 96 -ar 22050  -acodec libmp3lame \
-	  "${MP3}"
-	
-	RETVAL4=$?
-	echo "ffmpeg RETVAL4 = $RETVAL4"
-	echo -n 'ffmpeg m4a->mp3 end   : '
-	date
-	echo ''
-	rm "${M4A}"
-fi
+		# ffmpeg flv->m4a
+		echo -n 'ffmpeg flv->m4a start : '
+		date
+		/usr/local/bin/ffmpeg \
+		  -y -i "$FLVFILE" \
+		  -vn -acodec copy \
+		  "$M4AFILE"
+		
+		RETVAL3=$?
+		echo "ffmpeg RETVAL3 = $RETVAL3"
+		echo -n 'ffmpeg flv->m4a end   : '
+		date
+		echo ''
 
+		# ffmpeg m4a->mp3
+		if [ $RETVAL3 = 0 ]; then
+			echo -n 'ffmpeg m4a->mp3 start : '
+			date
+			/usr/local/bin/ffmpeg \
+			  -y -i "$M4AFILE" \
+			  -vn -ab 96 -ar 22050  -acodec libmp3lame \
+			  "$MP3FILE"
+			
+			RETVAL4=$?
+			echo "ffmpeg RETVAL4 = $RETVAL4"
+			echo -n 'ffmpeg m4a->mp3 end   : '
+			date
+			echo ''
+			rm "$M4AFILE"
+		fi
+
+		FLV_SIZE=`ls -l "$FLVFILE" | awk '{ print $5}'`
+		MP4_SIZE=`ls -l "$MP4FILE" | awk '{ print $5}'`
+		RATIO=`perl -e "printf(\"%d\n\", ($MP4_SIZE / $FLV_SIZE * 100) + 0.5);"`
+		echo RATIO=$RATIO  FLV_SIZE=$FLV_SIZE  MP4_SIZE=$MP4_SIZE
+		echo MAX=$MAX  MIN=$MIN
+
+		if [ $RETVAL1 -eq 0 -a $RETVAL2 -eq 0 ]; then
+			if [ $RATIO -le $MAX -a $RATIO -ge $MIN ]; then
+				echo "rm $FLVFILE"
+				rm "$FLVFILE"
+			else
+				echo "rm skip."
+			fi
+		fi
+	fi
+	LOOP_CNT=$LOOP_CNT+1
+done
 
 if [ $RETVAL1 != 0 ]; then
 	exit 2
 fi
-
-MAX='101'
-MIN='97'
-FLV_SIZE=`ls -l "${FLV}" | awk '{ print $5}'`
-MP4_SIZE=`ls -l "${MP4}" | awk '{ print $5}'`
-RATIO=`perl -e "printf(\"%d\n\", ($MP4_SIZE / $FLV_SIZE * 100) + 0.5);"`
-echo RATIO=$RATIO  FLV_SIZE=$FLV_SIZE  MP4_SIZE=$MP4_SIZE
-echo MAX=$MAX  MIN=$MIN
-
-if [ $RETVAL1 -eq 0 -a $RETVAL2 -eq 0 ]; then
-	if [ $RATIO -le $MAX -a $RATIO -ge $MIN ]; then
-		#echo true
-		echo "rm ${FLV}"
-		rm "${FLV}"
-	else
-		#echo false
-		echo "rm skip."
-	fi
-fi
-find $BASE -type f -size 0 -print0 | xargs -0 rm
 
 #vim: ts=4:sw=4
 
