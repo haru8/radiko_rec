@@ -131,7 +131,7 @@ get_auth() {
 	
 		if [ $? -ne 0 ]; then
 			echo "failed get player"
-			exit 1
+			return 1
 		fi
 	fi
 	
@@ -141,9 +141,9 @@ get_auth() {
 	if [ ! -s $KEYFILE ]; then
 		swfextract -b 14 $PLAYERFILE -o $KEYFILE
 	
-	  if [ ! -s $KEYFILE ]; then
-		echo "failed get keydata"
-		exit 1
+		if [ ! -s $KEYFILE ]; then
+			echo "failed get keydata"
+			return 1
 		fi
 	fi
 	
@@ -168,7 +168,7 @@ get_auth() {
 	
 	if [ $? -ne 0 ]; then
 		echo "failed auth1 process"
-		exit 1
+		return 1
 	fi
 	
 	#
@@ -206,7 +206,7 @@ get_auth() {
 	
 	if [ $? -ne 0 -o ! -f $AUTHFILE2 ]; then
 		echo "failed auth2 process"
-		exit 1
+		return 1
 	fi
 	
 	echo "authentication success"
@@ -216,6 +216,7 @@ get_auth() {
 	echo ''
 	
 	rm -f $AUTHFILE2
+	return 0
 }
 
 
@@ -230,17 +231,20 @@ rec() {
 	local filename="$3"
 
 	if [ $ISNHK = 0 ]; then
-		rtmpdump -v \
-		    -r "$SERVER_NAME" \
-		    --playpath $PLAYPATH \
-		    --app "${station}/_definst_" \
-		    -W $PLAYERURL \
-		    -C S:"" -C S:"" -C S:"" -C S:$AUTHTOKEN \
-		    --live \
-		    --stop $rec_time \
-		    -m 10 \
-		    -o "${filename}"
-		RET=$?
+		get_auth
+		if [ $? = 0 ]; then
+			rtmpdump -v \
+			    -r "$SERVER_NAME" \
+			    --playpath $PLAYPATH \
+			    --app "${station}/_definst_" \
+			    -W $PLAYERURL \
+			    -C S:"" -C S:"" -C S:"" -C S:$AUTHTOKEN \
+			    --live \
+			    --stop $rec_time \
+			    -m 10 \
+			    -o "${filename}"
+			RET=$?
+		fi
 	else
 		rtmpdump -v \
 		    -r "$SERVER_NAME" \
@@ -325,7 +329,9 @@ create_filename() {
 	REC_MIN=$STOP/60
     REC_SEC="$STOP-($REC_MIN*60)"
 	FLV="${FILE}.flv"
+	FLVS+=("${FLV}")
 	MP3="${FILE}.mp3"
+	MP3S+=("${MP3}")
 	
 	echo 'now date :' $RUN_DATE
 	#echo 'run_s    :' $run_s
@@ -344,7 +350,7 @@ echo run date : $RUN_DATE
 declare -i REC_MIN
 declare -i REC_SEC
 declare -i STOP
-create_filename "$@"
+#create_filename "$@"
 
 # 録音実施
 declare -i REC_CNT=1
@@ -357,71 +363,80 @@ while [ $RETVAL1 != 0 ]; do
 	create_filename "$@"
     echo "REC_CNT = $REC_CNT"
 	echo ''
-	if [ $ISNHK = 0 ]; then
-		get_auth
-	fi
 	rec $ST $STOP "${FLV}"
 	RETVAL1=$?
 	echo "rec RETVAL1 = $RETVAL1"
 	echo ''
 	REC_CNT=$REC_CNT+1
 	if [ $REC_CNT -gt $REC_MAX ]; then
-		exit 1
+		break
 	fi
 done
 
 # 容量0のファイルを削除
-find $DIR -type f -size 1 -print0 | xargs -0 rm
+find $DIR -type f -size 0 -print0 -exec rm {} \;
 
 #
 # ffmpeg flv->mp3
 #
-echo -n ffmpeg start : 
-date
-/usr/local/bin/ffmpeg \
-  -y -i "${FLV}" \
-  -metadata StreamTitle="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
-  -metadata author="${STATION}" \
-  -metadata artist="${STATION}" \
-  -metadata title="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
-  -metadata album="${NAME}" \
-  -metadata genre="ラジオ" \
-  -metadata year="${YEAR}" \
-  -metadata comment="${NAME}(${STATION}) ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
-  -aq 9 -ar 22050 -ac 2 -acodec libmp3lame "${MP3}"
+declare -i LOOP_MAX="${#FLVS[@]}"
+declare -i LOOP_CNT=0
+MAX='120'
+MIN='70'
+echo LOOP_MAX=$LOOP_MAX
+while [ $LOOP_CNT -lt $LOOP_MAX ]; do
+	echo LOOP_CNT=$LOOP_CNT
+	echo -n ffmpeg start : 
+	date
+	FLVFILE="${FLVS[$LOOP_CNT]}"
+	MP3FILE="${MP3S[$LOOP_CNT]}"
+	echo "$FLVFILE"
+	echo "$MP3FILE"
+	/usr/local/bin/ffmpeg \
+	  -y -i "$FLVFILE" \
+	  -metadata StreamTitle="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
+	  -metadata author="${STATION}" \
+	  -metadata artist="${STATION}" \
+	  -metadata title="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
+	  -metadata album="${NAME}" \
+	  -metadata genre="ラジオ" \
+	  -metadata year="${YEAR}" \
+	  -metadata comment="${NAME}(${STATION}) ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
+	  -aq 9 -ar 22050 -ac 2 -acodec libmp3lame "$MP3FILE"
+	RETVAL2=$?
+	echo "ffmpeg RETVAL2 = $RETVAL2"
+	echo -n ffmpeg end   : 
+	date
+	echo ''
+
+	FLV_SIZE=`ls -l "$FLVFILE" | awk '{ print $5}'`
+	MP3_SIZE=`ls -l "$MP3FILE" | awk '{ print $5}'`
+	RATIO=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $FLV_SIZE * 100) + 0.5);"`
+	echo RATIO=$RATIO  FLV_SIZE=$FLV_SIZE  MP3_SIZE=$MP3_SIZE
+	echo MAX=$MAX  MIN=$MIN
+	
+	if [ $RETVAL1 -eq 0 -a $RETVAL2 -eq 0 ]; then
+		if [ $RATIO -le $MAX -a $RATIO -ge $MIN ]; then
+			#echo true
+			echo "rm $FLVFILE"
+			rm "$FLVFILE"
+		else
+			#echo false
+			echo "rm skip."
+		fi
+	fi
+	LOOP_CNT=$LOOP_CNT+1
+done
 
 #  -aq 9 -acodec libmp3lame "${MP3}"
 #  -ab 64k -acodec libmp3lame "${MP3}"
 
-RETVAL2=$?
-echo "ffmpeg RETVAL2 = $RETVAL2"
-echo -n ffmpeg end   : 
-date
-echo ''
 
 if [ $RETVAL1 != 0 ]; then
 	exit 2
 fi
 
-MAX='120'
-MIN='70'
-FLV_SIZE=`ls -l "${FLV}" | awk '{ print $5}'`
-MP3_SIZE=`ls -l "${MP3}" | awk '{ print $5}'`
-RATIO=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $FLV_SIZE * 100) + 0.5);"`
-echo RATIO=$RATIO  FLV_SIZE=$FLV_SIZE  MP3_SIZE=$MP3_SIZE
-echo MAX=$MAX  MIN=$MIN
-
-if [ $RETVAL1 -eq 0 -a $RETVAL2 -eq 0 ]; then
-	if [ $RATIO -le $MAX -a $RATIO -ge $MIN ]; then
-		#echo true
-		echo "rm ${FLV}"
-		rm "${FLV}"
-	else
-		#echo false
-		echo "rm skip."
-	fi
-fi
-find $BASE -type f -size 0 -print0 | xargs -0 rm
+#find $BASE/ -type f -size 0 -print0 | xargs -0 rm
 
 #vim: ts=4:sw=4
 
