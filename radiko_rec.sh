@@ -388,55 +388,53 @@ while [ $LOOP_CNT -lt $LOOP_MAX ]; do
 	echo LOOP_CNT=$LOOP_CNT
 	echo -n ffmpeg start : 
 	date
+
 	FLVFILE="${FLVS[$LOOP_CNT]}"
 	MP3FILE="${MP3S[$LOOP_CNT]}"
 	echo "$FLVFILE"
 	echo "$MP3FILE"
-	/usr/local/bin/ffmpeg \
-	  -y -i "$FLVFILE" \
-	  -metadata StreamTitle="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
-	  -metadata author="${STATION}" \
-	  -metadata artist="${STATION}" \
-	  -metadata title="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
-	  -metadata album="${NAME}" \
-	  -metadata genre="ラジオ" \
-	  -metadata year="${YEAR}" \
-	  -metadata comment="${NAME}(${STATION}) ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
-	  -aq 9 -ar 22050 -ac 2 -acodec libmp3lame "$MP3FILE"
-	RETVAL2=$?
-	echo "ffmpeg RETVAL2 = $RETVAL2"
-	echo -n ffmpeg end   : 
-	date
-	echo ''
 
-	FLV_SIZE=`ls -l "$FLVFILE" | awk '{ print $5}'`
-	MP3_SIZE=`ls -l "$MP3FILE" | awk '{ print $5}'`
-	RATIO=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $FLV_SIZE * 100) + 0.5);"`
-	echo RATIO=$RATIO  FLV_SIZE=$FLV_SIZE  MP3_SIZE=$MP3_SIZE
-	echo MAX=$MAX  MIN=$MIN
-	
-	if [ $RETVAL1 -eq 0 -a $RETVAL2 -eq 0 ]; then
-		if [ $RATIO -le $MAX -a $RATIO -ge $MIN ]; then
-			#echo true
-			echo "rm $FLVFILE"
-			rm "$FLVFILE"
-		else
-			#echo false
-			echo "rm skip."
+	if [ -f "$FLVFILE" ]; then
+		/usr/local/bin/ffmpeg \
+		  -y -i "$FLVFILE" \
+		  -metadata StreamTitle="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
+		  -metadata author="${STATION}" \
+		  -metadata artist="${STATION}" \
+		  -metadata title="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
+		  -metadata album="${NAME}" \
+		  -metadata genre="ラジオ" \
+		  -metadata year="${YEAR}" \
+		  -metadata comment="${NAME}(${STATION}) ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
+		  -aq 9 -ar 22050 -ac 2 -acodec libmp3lame "$MP3FILE"
+		RETVAL2=$?
+		echo "ffmpeg RETVAL2 = $RETVAL2"
+		echo -n ffmpeg end   : 
+		date
+		echo ''
+
+		FLV_SIZE=`ls -l "$FLVFILE" | awk '{ print $5}'`
+		MP3_SIZE=`ls -l "$MP3FILE" | awk '{ print $5}'`
+		RATIO=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $FLV_SIZE * 100) + 0.5);"`
+		echo RATIO=$RATIO  FLV_SIZE=$FLV_SIZE  MP3_SIZE=$MP3_SIZE
+		echo MAX=$MAX  MIN=$MIN
+
+		if [ $RETVAL1 -eq 0 -a $RETVAL2 -eq 0 ]; then
+			if [ $RATIO -le $MAX -a $RATIO -ge $MIN ]; then
+				#echo true
+				echo "rm $FLVFILE"
+				rm "$FLVFILE"
+			else
+				#echo false
+				echo "rm skip."
+			fi
 		fi
 	fi
 	LOOP_CNT=$LOOP_CNT+1
 done
 
-#  -aq 9 -acodec libmp3lame "${MP3}"
-#  -ab 64k -acodec libmp3lame "${MP3}"
-
-
 if [ $RETVAL1 != 0 ]; then
 	exit 2
 fi
-
-#find $BASE/ -type f -size 0 -print0 | xargs -0 rm
 
 #vim: ts=4:sw=4
 
