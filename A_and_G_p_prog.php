@@ -22,9 +22,9 @@ for ($td = 1; $td <= 7; $td++ ) {
 
     for($tr = 0; $tr < 1440; $tr++ ) {
         $h         = $xpath->query(".//tbody/tr[$tr]/th", $table)->item(0)->nodeValue;
-        $throwspan = $xpath->query(".//tbody/tr[$tr]/th/@rowspan", $table)->item(0)->nodeValue;
-        $lengthmin = $xpath->query(".//tbody/tr[$tr]/td/@rowspan", $table)->item(0)->nodeValue;
-        $bg        = $xpath->query(".//tbody/tr[$tr]/td/@class", $table)->item(0)->nodeValue;
+        $throwspan = $xpath->query(".//tbody/tr[$tr]/th[$td]/@rowspan", $table)->item(0)->nodeValue;
+        $lengthmin = $xpath->query(".//tbody/tr[$tr]/td[$td]/@rowspan", $table)->item(0)->nodeValue;
+        $bg        = $xpath->query(".//tbody/tr[$tr]/td[$td]/@class", $table)->item(0)->nodeValue;
         $time      = $xpath->query(".//tbody/tr[$tr]/td[$td]/div[@class=\"time\"]", $table)->item(0)->nodeValue;
         $prog      = $xpath->query(".//tbody/tr[$tr]/td[$td]/div[@class=\"title-p\"]", $table)->item(0)->nodeValue;
         $rp        = $xpath->query(".//tbody/tr[$tr]/td[$td]/div[@class=\"rp\"]", $table)->item(0)->nodeValue;
