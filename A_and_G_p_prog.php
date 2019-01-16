@@ -1,6 +1,12 @@
 #!/usr/bin/env php
 <?php
 
+$options = getopt('dn');
+$today  = isset($options['d']) ? true : false; // 今日のみ
+$nowona = isset($options['n']) ? true : false; // 今のみ
+//var_dump($options);
+//die();
+
 $url = 'http://www.agqr.jp/timetable/streaming.html';
 $html = file_get_contents($url);
 $dom = new DOMDocument('1.0', 'UTF-8');
@@ -15,12 +21,38 @@ $xpath->registerPHPFunctions();
 
 $table = $xpath->query('//table[@class="timetb-ag"]')->item(0);
 
-for ($td = 1; $td <= 7; $td++ ) {
+if ($nowona) {
+    $today = true;
+}
+if ($today) {
+    $now_time = time();
+    $today_start_time = strtotime(date('Ymd'));
+    $today_end_time = $today_start_time + (24 * 60 * 60);
+}
+
+if ($nowona || $today) {
+    $dw = date('w');
+    $from_dw = $dw;
+    $to_dw   = $dw;
+} else {
+    $from_dw = 1;
+    $to_dw   = 7;
+}
+for ($td = $from_dw; $td <= $to_dw; $td++ ) {
 
     $day = $xpath->query(".//thead/tr/td[$td]", $table)->item(0)->nodeValue;
-    echo _trim($day), PHP_EOL;
+    //echo _trim($day), PHP_EOL;
 
-    for($tr = 0; $tr < 1440; $tr++ ) {
+    if ($nowona) {
+      $h_min = date('G');
+      $h_min = $h_min * 60 - 370;
+      $to_min   = $h_min;
+      $from_min = $to_min + 70;
+    } else {
+      $to_min   = 0;
+      $from_min = 1440;
+    }
+    for($tr = $to_min; $tr < $from_min; $tr++ ) {
         $h         = $xpath->query(".//tbody/tr[$tr]/th", $table)->item(0)->nodeValue;
         $throwspan = $xpath->query(".//tbody/tr[$tr]/th[$td]/@rowspan", $table)->item(0)->nodeValue;
         $lengthmin = $xpath->query(".//tbody/tr[$tr]/td[$td]/@rowspan", $table)->item(0)->nodeValue;
@@ -34,11 +66,31 @@ for ($td = 1; $td <= 7; $td++ ) {
             $sec   = _m2s($lengthmin);
             $bgStr = _bg($bg);
             $time = substr(_trim($time), 0, 5);
+            $start_time = strtotime($start[0]);
+            $end_time   = strtotime($end[0]);
             //echo sprintf("%4d", $tr), ' ';
-            echo $start[0], ' ', $end[0], ' ', $start[1], ' ', $end[1], ' ', sprintf("%4d", $sec), ' ',  $bgStr, ' ',  _trim($prog, true), '(', _trim($rp), ')',  PHP_EOL;
+            if ($nowona || $today) {
+                if ($nowona &&
+                    ($start_time <= $now_time &&
+                     $end_time   >= $now_time)) {
+                    showProgram($start, $end, $sec, $bgStr, $prog, $rp);
+                }
+                if ($today && !$nowona &&
+                    ($today_start_time <= $start_time &&
+                     $today_end_time   >= $start_time)) {
+                    showProgram($start, $end, $sec, $bgStr, $prog, $rp);
+                }
+            } else {
+                showProgram($start, $end, $sec, $bgStr, $prog, $rp);
+            }
         }
     }
     echo PHP_EOL;
+}
+
+function showProgram($start, $end, $sec, $bgStr, $prog, $rp)
+{
+    echo $start[0], ' ', $end[0], ' ', $start[1], ' ', $end[1], ' ', sprintf("%4d", $sec), ' ',  $bgStr, ' ',  _trim($prog, true), '(', _trim($rp), ')',  PHP_EOL;
 }
 
 function _trim($str, $slash = false)
