@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 
-$options = getopt('a::s:dn');
+$options = getopt('a::s:dnt');
 //var_dump($options);
 //if (isset($options['a'])) {
 //    echo a, PHP_EOL;
@@ -11,7 +11,8 @@ $options = getopt('a::s:dn');
 if (isset($options['s'])) {
     $day = isset($options['d']) ? true : false;
     $now = isset($options['n']) ? true : false;
-    showProgramByStation($options['s'], $day, $now);
+    $ton = isset($options['t']) ? true : false;
+    showProgramByStation($options['s'], $day, $now, $ton);
 } else if(isset($options['a'])) {
     showStatioByAreaId($options['a']);
 } else {
@@ -40,7 +41,7 @@ function showStatioByAreaId($areaId)
     }
 }
 
-function showProgramByStation($stationId, $day, $now)
+function showProgramByStation($stationId, $day, $now, $ton)
 {
     // 今のみ
     $dateTime = '';
@@ -50,12 +51,20 @@ function showProgramByStation($stationId, $day, $now)
     }
     // 今日のみ
     if ($day) {
-        $date = date('Ymd');
+        $h = date('G');
+        if ($h <= 4) {
+            $h = $h + 24;
+            $yesterday = strtotime(date('Ymd')) - (60 * 60 * 24);
+            $yesterdayTime = date('Ymd', $yesterday);
+            $date = $yesterdayTime;
+        } else {
+            $date = date('Ymd');
+        }
     }
 
     // 都道府県別
     #$url = 'http://radiko.jp/v2/api/program/today?area_id=JP13';
-    
+
     // 放送局別
     $url = 'http://radiko.jp/v2/api/program/station/weekly?station_id=' . $stationId;
     $xml = file_get_contents($url);
@@ -65,25 +74,27 @@ function showProgramByStation($stationId, $day, $now)
     $program = new SimpleXMLElement($xml);
     $station = $program->stations->station;
 
-    echo $station['id'] .': ' . _trim($station->name) . PHP_EOL;
-    echo PHP_EOL;
-    
+    //echo $station['id'] .': ' . _trim($station->name) . PHP_EOL;
+    //echo PHP_EOL;
+
     $scd = $station->scd;
     foreach ($scd->progs as $progs) {
         $progsDate = (int)$progs->date;
         if ($day || $now) {
             if ($date == $progsDate) {
-                showProgram($progs, $dateTime);
+                showProgram($progs, $dateTime, $ton);
             }
         } else {
-            showProgram($progs, $dateTime);
+            showProgram($progs, $dateTime, $ton);
         }
     }
 }
 
-function showProgram($progs, $dateTime)
+function showProgram($progs, $dateTime, $ton)
 {
-    echo "\nDATE: $progs->date" . PHP_EOL;
+    if ($dateTime == '') {
+        echo "\nDATE: $progs->date" . PHP_EOL;
+    }
     foreach ($progs->prog as $prog) {
         $ft    = (int)$prog['ft'];
         $to    = (int)$prog['to'];
@@ -91,29 +102,34 @@ function showProgram($progs, $dateTime)
         $title = _trim($prog->title);
         $pfm   = _trim($prog->pfm);
         if ($dateTime == '') {
-            echo $ft. ' ' . $to . ' ' . $prog['ftl'] . ' ' . $prog['tol'] . ' ' . $dur . ' ' . $title;
-            if ($pfm != '') {
-                echo ' pfm:' . $pfm;
-            }
-            echo PHP_EOL;
+            showRow(array('ft' => $ft, 'to' => $to, 'ftl' => $prog['ftl'], 'tol' => $prog['tol'], 'dur' => $dur, 'title' => $title), $ton);
         } else {
             if ($ft <= $dateTime && $to >= $dateTime) {
-            echo $ft. ' ' . $to . ' ' . $prog['ftl'] . ' ' . $prog['tol'] . ' ' . $dur . ' ' . $title;
-            if ($pfm != '') {
-                echo ' pfm:' . $pfm;
-            }
-            echo PHP_EOL;
+                showRow(array('ft' => $ft, 'to' => $to, 'ftl' => $prog['ftl'], 'tol' => $prog['tol'], 'dur' => $dur, 'title' => $title), $ton);
             }
         }
     }
+}
+
+function showRow($parm, $ton)
+{
+    if ($ton) {
+        echo $parm['title'];
+    } else {
+        echo $parm['ft']. ' ' . $parm['to'] . ' ' . $parm['ftl'] . ' ' . $parm['tol'] . ' ' . $parm['dur'] . ' ' . $parm['title'];
+    }
+    if ($parm['pfm'] != '') {
+        echo '(' . $parm['pfm'] . ')';
+    }
+    echo PHP_EOL;
 }
 
 function _trim($str)
 {
     $str = mb_convert_kana($str, 'sanrK');
     $str = trim($str);
-    $str = preg_replace('/[\n\r\t]/', '', $str);
-    $str = preg_replace('/\s{2,}/', '', $str);
+    $str = preg_replace('/[\n\r\t]/', ' ', $str);
+    $str = preg_replace('/\s{2,}/', ' ', $str);
 
     $patterns     = array('/\?/', '/!/', '/\*/');
     $replacements = array('？'  , '！' , '＊');
