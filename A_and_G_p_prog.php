@@ -1,9 +1,10 @@
 #!/usr/bin/env php
 <?php
 
-$options = getopt('dn');
-$today  = isset($options['d']) ? true : false; // 今日のみ
-$nowona = isset($options['n']) ? true : false; // 今のみ
+$options = getopt('dnt');
+$today     = isset($options['d']) ? true : false; // 今日のみ
+$nowona    = isset($options['n']) ? true : false; // 今のみ
+$titleonly = isset($options['t']) ? true : false; // タイトルのみ
 //var_dump($options);
 //die();
 
@@ -25,15 +26,27 @@ if ($nowona) {
     $today = true;
 }
 if ($today) {
+    $h = date('G');
+    if ($h <= 4) {
+        $yesterday = strtotime(date('Ymd')) - (60 * 60 * 24);
+        $today_start_time = $yesterday;
+    } else {
+        $today_start_time = strtotime(date('Ymd'));
+    }
     $now_time = time();
-    $today_start_time = strtotime(date('Ymd'));
-    $today_end_time = $today_start_time + (24 * 60 * 60);
+    $today_end_time = $today_start_time + (24 * 60 * 60) + (4 * 60 * 60);
 }
 
 if ($nowona || $today) {
     $dw = date('w');
-    $from_dw = $dw;
-    $to_dw   = $dw;
+    $h = date('G');
+    if ($h <= 4) {
+        $from_dw = $dw - 1;
+        $to_dw   = $dw - 1;
+    } else {
+        $from_dw = $dw;
+        $to_dw   = $dw;
+    }
 } else {
     $from_dw = 1;
     $to_dw   = 7;
@@ -44,8 +57,11 @@ for ($td = $from_dw; $td <= $to_dw; $td++ ) {
     //echo _trim($day), PHP_EOL;
 
     if ($nowona) {
-      $h_min = date('G');
-      $h_min = $h_min * 60 - 370;
+      $h = date('G');
+      if ($h <= 4) {
+        $h = $h + 24;
+      }
+      $h_min = $h * 60 - 370;
       $to_min   = $h_min;
       $from_min = $to_min + 70;
     } else {
@@ -73,24 +89,31 @@ for ($td = $from_dw; $td <= $to_dw; $td++ ) {
                 if ($nowona &&
                     ($start_time <= $now_time &&
                      $end_time   >= $now_time)) {
-                    showProgram($start, $end, $sec, $bgStr, $prog, $rp);
+                    showProgram($start, $end, $sec, $bgStr, $prog, $rp, $titleonly);
                 }
                 if ($today && !$nowona &&
                     ($today_start_time <= $start_time &&
                      $today_end_time   >= $start_time)) {
-                    showProgram($start, $end, $sec, $bgStr, $prog, $rp);
+                    showProgram($start, $end, $sec, $bgStr, $prog, $rp, $titleonly);
                 }
             } else {
-                showProgram($start, $end, $sec, $bgStr, $prog, $rp);
+                showProgram($start, $end, $sec, $bgStr, $prog, $rp, $titleonly);
             }
         }
     }
-    echo PHP_EOL;
+    if (!$nowona && !$today) {
+        echo PHP_EOL;
+    }
 }
 
-function showProgram($start, $end, $sec, $bgStr, $prog, $rp)
+function showProgram($start, $end, $sec, $bgStr, $prog, $rp, $titleonly)
 {
-    echo $start[0], ' ', $end[0], ' ', $start[1], ' ', $end[1], ' ', sprintf("%4d", $sec), ' ',  $bgStr, ' ',  _trim($prog, true), '(', _trim($rp), ')',  PHP_EOL;
+    if ($titleonly) {
+        echo _trim($prog, true), '(', _trim($rp), ')',  PHP_EOL;
+    } else {
+        //echo $start[0], ' ', $end[0], ' ', $start[1], ' ', $end[1], ' ', sprintf("%4d", $sec), ' ',  $bgStr, ' ',  _trim($prog, true), '(', _trim($rp), ')',  PHP_EOL;
+        echo $start[0], ' ', $end[1], ' ', sprintf("%4d", $sec), ' ',  $bgStr, ' ',  _trim($prog, true), '(', _trim($rp), ')',  PHP_EOL;
+    }
 }
 
 function _trim($str, $slash = false)
