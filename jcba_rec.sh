@@ -5,6 +5,7 @@ export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH
 
 SERVER_NAME1="http://musicbird-hls.leanstream.co/musicbird/"
+# 放送局はとりあえず 市川うららFM 固定
 STATIONID=JCB020
 PLAYPATH1=".stream/playlist.m3u8"
 BASE=/home/haru/radiko_rec
@@ -39,18 +40,13 @@ time_check() {
 }
 
 #
-# rtmpdump
+# rec
 #  $1
 #  $2
 rec() {
     local rec_time=$1
     local filename="$2"
-    local -i snum=$RANDOM%2+1
-    #local -i pnum=$RANDOM%2+1
-    local -i pnum=`seq 1 3 | shuf | head -1`
 
-    echo *=======================*
-    echo pnum = $pnum
     echo *=======================*
     PLAYPATH="${STATIONID}${PLAYPATH1}"
     SERVER_NAME="${SERVER_NAME1}${PLAYPATH}"
@@ -59,17 +55,19 @@ rec() {
     echo *=======================*
 
     #TITLE=`~/bin/A_and_G_p_prog.php -n`
-    TITLE="彩音のChoco-Bana Radio"
+    TITLE=$NAME
 
 echo "ファイル名: ${filename}
-放送局: 超A&G+
+放送局: ${STATIONNAME}
 番組名: $TITLE
 開始時間: `date '+%Y/%m/%d %H:%M:%S'`
 録音時間: $rec_time" | ~/bin/slack_agqr.sh -h "録音開始: $$"
-    /usr/local/bin/ffmpeg -i "${SERVER_NAME}" -movflags faststart -t $rec_time -c copy -bsf:a aac_adtstoasc "${filename}"
+    /usr/local/bin/ffmpeg -y -i "${SERVER_NAME}" -t $rec_time -timeout 10 -movflags faststart -c copy -bsf:a aac_adtstoasc "${filename}"
     RET=$?
+    RECFILE=`ls -lh "${filename}"`
 echo "ファイル名: ${filename}
-放送局: 超A&G+
+${RECFILE}
+放送局: ${STATIONNAME}
 番組名: $TITLE
 終了時間: `date '+%Y/%m/%d %H:%M:%S'`
 録音時間: $rec_time" | ~/bin/slack_agqr.sh -h "録音完了: $$"
@@ -198,8 +196,8 @@ find $BASE/ -type f -size 0 -print0 -exec rm {} \;
 
 declare -i LOOP_MAX="${#FLVS[@]}"
 declare -i LOOP_CNT=0
-MAX='101'
-MIN='97'
+MAX=115
+MIN=95
 echo LOOP_MAX=$LOOP_MAX
 while [ $LOOP_CNT -lt $LOOP_MAX ]; do
     echo LOOP_CNT=$LOOP_CNT
@@ -215,71 +213,71 @@ while [ $LOOP_CNT -lt $LOOP_MAX ]; do
 
     if [ -f "$FLVFILE" ]; then
         # ffmpeg flv->mp4
-        echo -n 'ffmpeg flv->mp4 start : '
-        date
-        /usr/local/bin/ffmpeg \
-          -y -i "$FLVFILE" \
-          -vcodec copy -acodec copy \
-          "$MP4FILE"
-
-        RETVAL2=$?
-        echo "ffmpeg RETVAL2 = $RETVAL2"
-        echo -n 'ffmpeg flv->mp4 end   : '
-        date
-        echo ''
-
-        # ffmpeg flv->mp3
-        #echo -n 'ffmpeg flv->mp3 start : '
+        #echo -n 'ffmpeg flv->mp4 start : '
         #date
         #/usr/local/bin/ffmpeg \
         #  -y -i "$FLVFILE" \
-        #  -ab 96 -ar 22050 -acodec libmp3lame \
-        #  "$MP3FILE"
-        #
-        #RETVAL3=$?
-        #echo "ffmpeg RETVAL3 = $RETVAL3"
-        #echo -n 'ffmpeg flv->mp3 end   : '
+        #  -vcodec copy -acodec copy \
+        #  "$MP4FILE"
+
+        #RETVAL2=$?
+        #echo "ffmpeg RETVAL2 = $RETVAL2"
+        #echo -n 'ffmpeg flv->mp4 end   : '
         #date
         #echo ''
 
-        # ffmpeg flv->m4a
-        echo -n 'ffmpeg flv->m4a start : '
+        # ffmpeg flv->mp3
+        echo -n 'ffmpeg flv->mp3 start : '
         date
         /usr/local/bin/ffmpeg \
           -y -i "$FLVFILE" \
-          -vn -acodec copy \
-          "$M4AFILE"
+          -ab 96 -ar 22050 -acodec libmp3lame \
+          "$MP3FILE"
 
         RETVAL3=$?
         echo "ffmpeg RETVAL3 = $RETVAL3"
-        echo -n 'ffmpeg flv->m4a end   : '
+        echo -n 'ffmpeg flv->mp3 end   : '
         date
         echo ''
 
-        # ffmpeg m4a->mp3
-        if [ $RETVAL3 = 0 ]; then
-            echo -n 'ffmpeg m4a->mp3 start : '
-            date
-            /usr/local/bin/ffmpeg \
-              -y -i "$M4AFILE" \
-              -vn -ab 96 -ar 22050  -acodec libmp3lame \
-              "$MP3FILE"
+        # ffmpeg flv->m4a
+        #echo -n 'ffmpeg flv->m4a start : '
+        #date
+        #/usr/local/bin/ffmpeg \
+        #  -y -i "$FLVFILE" \
+        #  -vn -acodec copy \
+        #  "$M4AFILE"
 
-            RETVAL4=$?
-            echo "ffmpeg RETVAL4 = $RETVAL4"
-            echo -n 'ffmpeg m4a->mp3 end   : '
-            date
-            echo ''
-            rm "$M4AFILE"
-        fi
+        #RETVAL3=$?
+        #echo "ffmpeg RETVAL3 = $RETVAL3"
+        #echo -n 'ffmpeg flv->m4a end   : '
+        #date
+        #echo ''
+
+        ## ffmpeg m4a->mp3
+        #if [ $RETVAL3 = 0 ]; then
+        #    echo -n 'ffmpeg m4a->mp3 start : '
+        #    date
+        #    /usr/local/bin/ffmpeg \
+        #      -y -i "$M4AFILE" \
+        #      -vn -ab 96 -ar 22050  -acodec libmp3lame \
+        #      "$MP3FILE"
+
+        #    RETVAL4=$?
+        #    echo "ffmpeg RETVAL4 = $RETVAL4"
+        #    echo -n 'ffmpeg m4a->mp3 end   : '
+        #    date
+        #    echo ''
+        #    rm "$M4AFILE"
+        #fi
 
         FLV_SIZE=`ls -l "$FLVFILE" | awk '{ print $5}'`
-        MP4_SIZE=`ls -l "$MP4FILE" | awk '{ print $5}'`
-        RATIO=`perl -e "printf(\"%d\n\", ($MP4_SIZE / $FLV_SIZE * 100) + 0.5);"`
-        echo RATIO=$RATIO  FLV_SIZE=$FLV_SIZE  MP4_SIZE=$MP4_SIZE
+        MP3_SIZE=`ls -l "$MP3FILE" | awk '{ print $5}'`
+        RATIO=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $FLV_SIZE * 100) + 0.5);"`
+        echo RATIO=$RATIO  FLV_SIZE=$FLV_SIZE  MP3_SIZE=$MP3_SIZE
         echo MAX=$MAX  MIN=$MIN
 
-        if [ $RETVAL1 -eq 0 -a $RETVAL2 -eq 0 ]; then
+        if [ $RETVAL1 -eq 0 -a $RETVAL3 -eq 0 ]; then
             if [ $RATIO -le $MAX -a $RATIO -ge $MIN ]; then
                 echo "rm $FLVFILE"
                 rm "$FLVFILE"
