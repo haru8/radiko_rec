@@ -32,7 +32,8 @@ $xpath->registerPHPFunctions();
 $table = $xpath->query('//table[@class="timetb-ag"]')->item(0);
 
 $nowTime = time();
-//$nowTime = $nowTime + ((60 * 60 * 24) * 2) + (60 * 60 * 13);
+//$nowTime = mktime(22, 00, 3, 3, 1, 2020); // h, m, s, m, d, y
+//$nowTime = $nowTime + ((60 * 60 * 24) * 0) - (60 * 60 * 0) + 1800;
 //echo $nowTime . PHP_EOL;
 //echo date('Y/m/d H:i:s', $nowTime) . PHP_EOL;
 if ($opt['nowona']) {
@@ -71,6 +72,9 @@ if ($to_dw == 0) {
     $to_dw = 7;
 }
 
+//echo '$from_dw  =' . $from_dw . PHP_EOL;
+//echo '$to_dw    =' . $to_dw . PHP_EOL;
+
 $allProgram = array();
 $n = 0;
 for ($td = $from_dw; $td <= $to_dw; $td++ ) {
@@ -80,16 +84,19 @@ for ($td = $from_dw; $td <= $to_dw; $td++ ) {
 
     if ($opt['nowona']) {
       $h = date('G', $nowTime);
+//echo '$h   =' . $h . PHP_EOL;
       if ($h <= 4) {
         $h = $h + 24;
       }
-      $h_min = ($h * 60) - 370;
+      $h_min = ($h * 60) - 360;
       $to_min   = $h_min;
       $from_min = $to_min + 70;
     } else {
       $to_min   = 0;
       $from_min = 1440;
     }
+//echo '$to_min   =' . $to_min . PHP_EOL;
+//echo '$from_min =' . $from_min . PHP_EOL;
     for ($tr = $to_min; $tr < $from_min; $tr++ ) {
         $h         = $xpath->query(".//tbody/tr[$tr]/th", $table)->item(0)->nodeValue;
         $throwspan = $xpath->query(".//tbody/tr[$tr]/th[$td]/@rowspan", $table)->item(0)->nodeValue;
@@ -107,7 +114,6 @@ for ($td = $from_dw; $td <= $to_dw; $td++ ) {
             $time = substr(_trim($time), 0, 5);
             $start_time = strtotime($program['start'][0]);
             $end_time   = strtotime($program['end'][0]);
-            //echo sprintf("%4d", $tr), ' ';
             $allProgram[$start_time] = $program;
             $n++;
         }
@@ -170,6 +176,7 @@ function showProgram($prog, $opt)
         }
     } else {
         $startDay = date('Y/m/d', strtotime($prog['start'][0]));
+//printf('td=%d tr=%04d ', $prog['td'], $prog['tr']);
         echo $startDay, ' ', _weekDay($prog['start'][0]), ' ', $prog['start'][1], ' ', $prog['end'][1], ' ', sprintf("%4d", $prog['sec']), ' ',  $prog['bgStr'], ' ',  _trim($prog['prog'], true);
         if (_trim($prog['rp'], true)) {
             echo '(', $prog['rp'], ')';
@@ -200,7 +207,7 @@ function _weekDay($day)
 {
   $dayTime = strtotime($day);
   $weekDay = array( '日', '月', '火', '水', '木', '金', '土');
-  return $weekDay[date('w')];
+  return $weekDay[date('w', $dayTime)];
 }
 
 function _bg($str)
