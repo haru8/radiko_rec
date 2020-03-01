@@ -32,7 +32,7 @@ $xpath->registerPHPFunctions();
 $table = $xpath->query('//table[@class="timetb-ag"]')->item(0);
 
 $nowTime = time();
-$nowTime = $nowTime + ((60 * 60 * 24) * 2) + (60 * 60 * 13);
+//$nowTime = $nowTime + ((60 * 60 * 24) * 2) + (60 * 60 * 13);
 //echo $nowTime . PHP_EOL;
 //echo date('Y/m/d H:i:s', $nowTime) . PHP_EOL;
 if ($opt['nowona']) {
