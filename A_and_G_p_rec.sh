@@ -13,8 +13,9 @@ export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH
 #SERVER_NAME2="rtmp://fms-base2.mitene.ad.jp/agqr/aandg11"
 SERVER_NAME1="rtmp://fms-base1.mitene.ad.jp/agqr/"
 SERVER_NAME2="rtmp://fms-base2.mitene.ad.jp/agqr/"
-PLAYPATH1="aandg2"
-PLAYPATH2="aandg111"
+PLAYPATH1="aandg333"
+PLAYPATH2="aandg1"
+PLAYPATH3="aandg1"
 BASE=/home/haru/radiko_rec
 ALLARG="$@"
 RUN_DATE=`date '+%Y/%m/%d %H:%M:%S'`
@@ -40,6 +41,10 @@ time_check() {
         usage
         exit 2
     fi
+    if [ $1 -lt 0 ]; then
+        echo "録音時間がマイナスになりました: $1"
+        exit 3
+    fi
 }
 
 #
@@ -50,7 +55,8 @@ rec() {
     local rec_time=$1
     local filename="$2"
     local -i snum=$RANDOM%2+1
-    local -i pnum=$RANDOM%2+1
+    #local -i pnum=$RANDOM%2+1
+    local -i pnum=`seq 1 3 | shuf | head -1`
 
     if [ $snum -eq 1 ]; then
         SERVER_NAME=$SERVER_NAME1
@@ -58,14 +64,27 @@ rec() {
         SERVER_NAME=$SERVER_NAME2
     fi
 
-    if [ $pnum -eq 1 ]; then
-        PLAYPATH=$PLAYPATH1
-    else
-        PLAYPATH=$PLAYPATH2
-    fi
+    echo *=======================*
+    echo pnum = $pnum
+    echo *=======================*
+    #if [ $pnum -eq 1 ]; then
+    #    PLAYPATH=$PLAYPATH1
+    #elif [ $pnum -eq 2 ]; then
+    #    PLAYPATH=$PLAYPATH2
+    #else
+    #    PLAYPATH=$PLAYPATH3
+    #fi
+    PLAYPATH=$PLAYPATH1
     SERVER_NAME="${SERVER_NAME}${PLAYPATH}"
-    echo $SERVER_NAME
+    echo *=======================*
+    echo SERVER_NAME = $SERVER_NAME
+    echo *=======================*
 
+echo "ファイル名: ${filename}
+放送局: 超A&G+
+番組名: ${PGNAME}
+開始時間: `date '+%Y/%m/%d %H:%M:%S'`
+録音時間: $rec_time" | ~/bin/slack_agqr.sh -h "録音開始: $$"
     rtmpdump -v \
         -r "${SERVER_NAME}" \
         --live \
@@ -81,6 +100,11 @@ rec() {
     #    -m 30 \
     #    -o "${filename}"
     RET=$?
+echo "ファイル名: ${filename}
+放送局: 超A&G+
+番組名: ${PGNAME}
+終了時間: `date '+%Y/%m/%d %H:%M:%S'`
+録音時間: $rec_time" | ~/bin/slack_agqr.sh -h "録音完了: $$"
     return $RET
 }
 
@@ -131,14 +155,44 @@ create_filename() {
     STOP=$STOP-$delay+5
     time_check $STOP
 
+    PGTITLE=`~/bin/A_and_G_p_prog.php -nt`
+    PGPRLTY=`~/bin/A_and_G_p_prog.php -np`
+    PGNAME="";
+    if [ -n "${PGTITLE}" ]; then
+        PGNAME="${PGTITLE}"
+    fi
+    if [ -n "${PGPRLTY}" ]; then
+        PGNAME="${PGTITLE}(${PGPRLTY})"
+    fi
+
     if [ $# = 1 ]; then
         # ファイル名指定なし
-        NAME=""
-        FILE=$DIR/${YMD_HMS}_${STATION}_${STOP}
+        if [ -n "${PGNAME}" ]; then
+            NAME="${PGNAME}"
+            CMDTITLE=""
+            FILEBODY=${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
+            FILEBODY=`php -r "echo substr(\"${FILEBODY}\", 0, 210);"`
+            FILE=$DIR/${FILEBODY}
+        else
+            NAME=""
+            CMDTITLE=""
+            FILE=$DIR/${YMD_HMS}_${STATION}_${STOP}
+        fi
     elif [ $# = 2 ]; then
         # ファイル名指定有り
-        NAME="$2"
-        FILE=$DIR/${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
+        if [ -n "${PGNAME}" ]; then
+            NAME="${PGNAME}"
+            CMDTITLE="$2"
+            FILEBODY=${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
+            FILEBODY=`php -r "echo substr(\"${FILEBODY}\", 0, 210);"`
+            FILE=$DIR/${FILEBODY}
+        else
+            NAME="$2"
+            CMDTITLE="$2"
+            FILEBODY=${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
+            FILEBODY=`php -r "echo substr(\"${FILEBODY}\", 0, 210);"`
+            FILE=$DIR/${FILEBODY}
+        fi
     else
         usage
         exit 3
@@ -227,6 +281,17 @@ while [ $LOOP_CNT -lt $LOOP_MAX ]; do
         date
         /usr/local/bin/ffmpeg \
           -y -i "$FLVFILE" \
+          -metadata artist=${PGPRLTY} \
+          -metadata title="${PGNAME}" \
+          -metadata album="${PGTITLE}" \
+          -metadata genre="ラジオ" \
+          -metadata date="${YEAR}" \
+          -metadata comment="超A&G+
+${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒
+番組タイトル  : ${PGTITLE}
+パーソナリティ: ${PGPRLTY}
+${NAME}
+${CMDTITLE}" \
           -vcodec copy -acodec copy \
           "$MP4FILE"
 
@@ -270,7 +335,21 @@ while [ $LOOP_CNT -lt $LOOP_MAX ]; do
             date
             /usr/local/bin/ffmpeg \
               -y -i "$M4AFILE" \
-              -vn -ab 96 -ar 22050  -acodec libmp3lame \
+              -metadata StreamTitle="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
+              -metadata author="超A&G+" \
+              -metadata artist=${PGPRLTY} \
+              -metadata title="${PGNAME}" \
+              -metadata album="${PGTITLE}" \
+              -metadata genre="ラジオ" \
+              -metadata year="${YEAR}" \
+              -metadata date="${YEAR}" \
+              -metadata comment="超A&G+
+${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒
+番組タイトル  : ${PGTITLE}
+パーソナリティ: ${PGPRLTY}
+${NAME}
+${CMDTITLE}" \
+              -vn -ab 96k -ar 22050  -acodec libmp3lame \
               "$MP3FILE"
 
             RETVAL4=$?
