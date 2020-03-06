@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 
-$options = getopt('a::s:dnt');
+$options = getopt('a::s:dntp');
 //var_dump($options);
 //if (isset($options['a'])) {
 //    echo a, PHP_EOL;
@@ -9,10 +9,11 @@ $options = getopt('a::s:dnt');
 //die();
 
 if (isset($options['s'])) {
-    $day = isset($options['d']) ? true : false;
-    $now = isset($options['n']) ? true : false;
-    $ton = isset($options['t']) ? true : false;
-    showProgramByStation($options['s'], $day, $now, $ton);
+    $day = isset($options['d']) ? true : false; // 今日のみ
+    $now = isset($options['n']) ? true : false; // 今のみ
+    $ton = isset($options['t']) ? true : false; // タイトルのみ
+    $pon = isset($options['p']) ? true : false; // パーソナリティのみ
+    showProgramByStation($options['s'], $day, $now, $ton, $pon);
 } else if(isset($options['a'])) {
     showStatioByAreaId($options['a']);
 } else {
@@ -41,7 +42,7 @@ function showStatioByAreaId($areaId)
     }
 }
 
-function showProgramByStation($stationId, $day, $now, $ton)
+function showProgramByStation($stationId, $day, $now, $ton, $pon)
 {
     // 今のみ
     $dateTime = '';
@@ -82,46 +83,86 @@ function showProgramByStation($stationId, $day, $now, $ton)
         $progsDate = (int)$progs->date;
         if ($day || $now) {
             if ($date == $progsDate) {
-                showProgram($progs, $dateTime, $ton);
+                showProgram($progs, $dateTime, $ton, $pon);
             }
         } else {
-            showProgram($progs, $dateTime, $ton);
+            showProgram($progs, $dateTime, $ton, $pon);
         }
     }
 }
 
-function showProgram($progs, $dateTime, $ton)
+function showProgram($progs, $dateTime, $ton, $pon)
 {
     if ($dateTime == '') {
         echo "\nDATE: $progs->date" . PHP_EOL;
     }
     foreach ($progs->prog as $prog) {
-        $ft    = (int)$prog['ft'];
-        $to    = (int)$prog['to'];
-        $dur   = sprintf("%5s", $prog['dur']);
-        $title = _trim($prog->title);
-        $pfm   = _trim($prog->pfm);
+      //var_dump($prog);
+      //die();
+        $ft    = (int)$prog['ft'];             // 開始(年月日時分秒)
+        $to    = (int)$prog['to'];             // 終了(年月日時分秒)
+        $dur   = sprintf("%5s", $prog['dur']); // 放送枠(秒)
+        $title = _trim($prog->title);          // タイトル
+        $pfm   = _trim($prog->pfm);            // パーソナリティ
+        $info  = _trim($prog->info);           // info
         if ($dateTime == '') {
-            showRow(array('ft' => $ft, 'to' => $to, 'ftl' => $prog['ftl'], 'tol' => $prog['tol'], 'dur' => $dur, 'title' => $title), $ton);
+            showRow(array('ft'    => $ft,
+                          'to'    => $to,
+                          'ftl'   => $prog['ftl'],
+                          'tol'   => $prog['tol'],
+                          'dur'   => $dur,
+                          'title' => $title,
+                          'pfm'   => $pfm,
+                          'info'  => $info),
+                    $ton, $pon);
         } else {
             if ($ft <= $dateTime && $to >= $dateTime) {
-                showRow(array('ft' => $ft, 'to' => $to, 'ftl' => $prog['ftl'], 'tol' => $prog['tol'], 'dur' => $dur, 'title' => $title), $ton);
+                showRow(array('ft'    => $ft,
+                              'to'    => $to,
+                              'ftl'   => $prog['ftl'],
+                              'tol'   => $prog['tol'],
+                              'dur'   => $dur,
+                              'title' => $title,
+                              'pfm'   => $pfm,
+                              'info'  => $info),
+                        $ton, $pon);
             }
         }
     }
 }
 
-function showRow($parm, $ton)
+function showRow($parm, $ton, $pon)
 {
-    if ($ton) {
-        echo $parm['title'];
+    if ($ton && $pon) {
+        $program = mb_strimwidth($parm['title'], 0, 200, '...');
+        $pfm     = mb_strimwidth($parm['pfm'],   0, 200, '...');
+        if ($pfm) {
+            $program .=  '(' . $pfm . ')';
+        }
+        echo mb_strimwidth($program, 0, 200, '...');
+        echo PHP_EOL;
+    } else if ($ton) {
+        $program = mb_strimwidth($parm['title'], 0, 200, '...');
+        echo $program;
+        echo PHP_EOL;
+    } else if ($pon) {
+        $pfm = mb_strimwidth($parm['pfm'],   0, 200, '...');
+        if ($pfm) {
+            echo mb_strimwidth($pfm, 0, 200, '...');
+            echo PHP_EOL;
+        }
     } else {
-        echo $parm['ft']. ' ' . $parm['to'] . ' ' . $parm['ftl'] . ' ' . $parm['tol'] . ' ' . $parm['dur'] . ' ' . $parm['title'];
+        $program = $parm['title'];
+        if ($parm['pfm']) {
+            $program .=  '(' . $parm['pfm'] . ')';
+        }
+        $program = mb_strimwidth($program, 0, 200, '...');
+        echo $parm['ft']. ' ' . $parm['to'] . ' ' . $parm['ftl'] . ' ' . $parm['tol'] . ' ' . $parm['dur'] . ' ' . $program;
+        echo PHP_EOL;
     }
-    if ($parm['pfm'] != '') {
-        echo '(' . $parm['pfm'] . ')';
-    }
-    echo PHP_EOL;
+    //if ($parm['info'] != '') {
+    //    echo '(' . $parm['info'] . ')';
+    //}
 }
 
 function _trim($str)
@@ -131,8 +172,8 @@ function _trim($str)
     $str = preg_replace('/[\n\r\t]/', ' ', $str);
     $str = preg_replace('/\s{2,}/', ' ', $str);
 
-    $patterns     = array('/\?/', '/!/', '/\*/');
-    $replacements = array('？'  , '！' , '＊');
+    $patterns     = array('/\?/', '/!/', '/\*/', '/\\\/', '/\//', '/:/', '/;/', '/"/', '/\</', '/\>/', '/\|/' );
+    $replacements = array('？'  , '！' , '＊'  , '￥'   , '／'  , '：' , '；' , '\'' , '＜'  , '＞'  , '｜') ;
     $str = preg_replace($patterns, $replacements, $str);
 
     return $str;
@@ -143,7 +184,16 @@ function usage($argv)
     echo 'Usage: ' , $argv[0], ' [options]', PHP_EOL;
     echo PHP_EOL;
     echo 'options:', PHP_EOL;
-    echo '  -a [area_id] default:13', PHP_EOL;
-    echo '  -s station_d [-d, -n]', PHP_EOL;
+    echo 'エリアのstation_idを表示:', PHP_EOL;
+    echo '-a [area_id] default:13', PHP_EOL;
+    echo '  -a 13    エリアを指定', PHP_EOL;
+    echo PHP_EOL;
+    echo 'station_idのプログラムを表示:', PHP_EOL;
+    echo '-s station_id [-d, -n, -t]', PHP_EOL;
+    echo '  -s       放送局IDを指定', PHP_EOL;
+    echo '  -d       今日のみ表示', PHP_EOL;
+    echo '  -n       今のみ表示', PHP_EOL;
+    echo '  -t       タイトルのみ表示', PHP_EOL;
+    echo '  -p       パーソナリティのみ表示', PHP_EOL;
 }
 
