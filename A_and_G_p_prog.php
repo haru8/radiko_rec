@@ -155,7 +155,7 @@ function showProgram($prog, $opt)
         $program = mb_strimwidth(_trim($prog['prog'], true), 0, 200, '...');
         $rp      = mb_strimwidth(_trim($prog['rp'], true), 0, 200, '...');
         if ($opt['persoonly'] && $rp) {
-            $program .= '(' . $prog['bgStr'] . ')';
+            $program .= '[' . $prog['bgStr'] . ']';
         }
         if ($rp) {
           $program .= '(' . $rp . ')';
@@ -166,7 +166,7 @@ function showProgram($prog, $opt)
         $program = mb_strimwidth(_trim($prog['prog'], true), 0, 200, '...');
         echo $program;
         if (_trim($prog['bgStr'])) {
-          echo '(' . $prog['bgStr'] . ')';
+          echo '[' . $prog['bgStr'] . ']';
         }
         echo PHP_EOL;
     } else if ($opt['persoonly']) {
