@@ -102,6 +102,17 @@ flv2mp3_enc() {
     fi
 }
 
+flv2mp4_enc() {
+    local ifile="$1"
+    local ofile="$2"
+
+    echo ffmpeg -y -i "$ifile" -vcodec copy -acodec copy "$ofile"
+    if [ $TESTMODE -eq 0 ]; then
+      ffmpeg -y -i "$ifile" -vcodec copy -acodec copy "$ofile"
+    fi
+}
+
+
 declare -i NUM=0
 declare -i EXIST_RM_NUM=0
 declare -i ENC_NUM=0
@@ -115,6 +126,7 @@ for FLV in $FLVS; do
     echo
     echo "NUM=$NUM"
     MP3=`echo "$FLV" | sed 's/\.flv$/.mp3/'`
+    MP4=`echo "$FLV" | sed 's/\.flv$/.mp4/'`
     declare -i FLVDURATION=0
     declare -i MP3DURATION=0
     if [ -f "$FLV" ]; then
@@ -148,7 +160,9 @@ for FLV in $FLVS; do
             echo "RATE=${RATE}%"
             #echo $RATE_CHECK
             if [ $RATE_CHECK = "OK" ]; then
-                echo "rm ${FLV}"
+                echo "`printf '%06s sec' ${FLVDURATION}` $FLV"
+                echo "`printf '%06s sec' ${MP3DURATION}` $MP3"
+                echo "RATE=${RATE}%. rm execution ${FLV}"
                 if [ $TESTMODE -eq 0 ]; then
                     rm "$FLV"
                 fi
