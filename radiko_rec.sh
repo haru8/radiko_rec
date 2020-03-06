@@ -49,12 +49,13 @@ usage() {
     echo "            NACK5           : NACK5" >&2
     echo "            ラジオ日本      : JORF" >&2
     echo "            FMヨコハマ      : YFM" >&2
-    echo "            東海ラジオ      : TOKAIRADIO" >&2
-    echo "            レディオキューブFM三重 : FMMIE" >&2
-    echo "            CBCラジオ       : CBC" >&2
     echo "            NHK第一放送     : JOAK" >&2
     echo "            NHK第二放送     : JOAB" >&2
     echo "            NHK FM          : JOAK-FM" >&2
+    echo ""
+    echo "            東海ラジオ      : TOKAIRADIO" >&2
+    echo "            レディオキューブFM三重 : FMMIE" >&2
+    echo "            CBCラジオ       : CBC" >&2
     echo "  time      Stop at num seconds into stream" >&2
     echo "  name      output file name" >&2
 }
@@ -77,12 +78,12 @@ station_check() {
         NACK5)  STATION='NACK5'         ;;
         JORF)   STATION='ラジオ日本'    ;;
         YFM)    STATION='FMヨコハマ'    ;;
-        TOKAIRADIO) STATION='東海ラジオ';;
-        FMMIE)  STATION='レディオキューブFM三重' ;;
-        CBC)    STATION='CBCラジオ'     ;;
         JOAK)   STATION='NHKラジオ第1'  ;;
         JOAB)   STATION='NHKラジオ第2'  ;;
         JOAK-FM) STATION='NHK-FM' ;;
+        TOKAIRADIO) STATION='東海ラジオ';;
+        FMMIE)  STATION='レディオキューブFM三重' ;;
+        CBC)    STATION='CBCラジオ'     ;;
 
         *)      usage
                 exit 1
@@ -215,6 +216,13 @@ rec() {
 
     get_auth
     if [ $? = 0 ]; then
+        #TITLE=`~/bin/radiko_prog.php -s $ST -n`
+        #TITLE2=`~/bin/radiko_prog.php -s $ST -nt`
+        echo "放送局: $STATION($ST)
+ファイル名: ${filename}
+番組名: ${PGNAME}
+開始時間: `date '+%Y/%m/%d %H:%M:%S'`
+録音時間: $rec_time" | ~/bin/slack_radiko.sh -h "録音開始: $$"
         rtmpdump -v \
             -r "$SERVER_NAME" \
             --playpath $PLAYPATH \
@@ -226,6 +234,11 @@ rec() {
             -m 10 \
             -o "${filename}"
         RET=$?
+        echo "放送局: $STATION($ST)
+ファイル名: ${filename}
+番組名: ${PGNAME}
+終了時間: `date '+%Y/%m/%d %H:%M:%S'`
+録音時間: $rec_time" | ~/bin/slack_radiko.sh -h "録音完了: $$"
     fi
 
     return $RET
@@ -280,14 +293,44 @@ create_filename() {
     STOP=`echo $STOP | sed 's/-//g'`
     time_check $STOP
 
+    PGTITLE=`~/bin/radiko_prog.php -s $ST -nt`
+    PGPRLTY=`~/bin/radiko_prog.php -s $ST -np`
+    PGNAME="";
+    if [ -n "${PGTITLE}" ]; then
+        PGNAME="${PGTITLE}"
+    fi
+    if [ -n "${PGPRLTY}" ]; then
+        PGNAME="${PGTITLE}(${PGPRLTY})"
+    fi
+
     if [ $# = 2 ]; then
         # ファイル名指定なし
-        NAME=""
-        FILE=$DIR/${YMD_HMS}_${ST}_${STOP}
+        if [ -n "${PGNAME}" ]; then
+            NAME="${PGNAME}"
+            CMDTITLE=""
+            FILEBODY=${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
+            FILEBODY=`php -r "echo substr(\"${FILEBODY}\", 0, 210);"`
+            FILE=$DIR/${FILEBODY}
+        else
+            NAME=""
+            CMDTITLE=""
+            FILE=$DIR/${YMD_HMS}_${ST}_${STOP}
+        fi
     elif [ $# = 3 ]; then
         # ファイル名指定有り
-        NAME="$3"
-        FILE=$DIR/${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
+        if [ -n "${PGNAME}" ]; then
+            NAME="${PGNAME}"
+            CMDTITLE="$3"
+            FILEBODY=${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
+            FILEBODY=`php -r "echo substr(\"${FILEBODY}\", 0, 210);"`
+            FILE=$DIR/${FILEBODY}
+        else
+            NAME="$3"
+            CMDTITLE="$3"
+            FILEBODY=${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
+            FILEBODY=`php -r "echo substr(\"${FILEBODY}\", 0, 210);"`
+            FILE=$DIR/${FILEBODY}
+        fi
     else
         usage
         exit 3
@@ -370,12 +413,17 @@ while [ $LOOP_CNT -lt $LOOP_MAX ]; do
           -y -i "$FLVFILE" \
           -metadata StreamTitle="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
           -metadata author="${STATION}" \
-          -metadata artist="${STATION}" \
-          -metadata title="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
-          -metadata album="${NAME}" \
+          -metadata artist="${PGPRLTY}" \
+          -metadata title="${PGNAME}" \
+          -metadata album="${PGTITLE}" \
           -metadata genre="ラジオ" \
           -metadata year="${YEAR}" \
-          -metadata comment="${NAME}(${STATION}) ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
+          -metadata date="${YEAR}" \
+          -metadata comment="${STATION}
+${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒
+番組タイトル  : ${PGTITLE}
+パーソナリティ: ${PGPRLTY}
+${CMDTITLE}" \
           -aq 9 -ar 22050 -ac 2 -acodec libmp3lame "$MP3FILE"
         RETVAL2=$?
         echo "ffmpeg RETVAL2 = $RETVAL2"
