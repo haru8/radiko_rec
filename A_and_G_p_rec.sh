@@ -81,8 +81,9 @@ rec() {
     echo *=======================*
 
 echo "ファイル名: ${filename}
-放送局: 超A&G+
-番組名: ${PGNAME}
+放送局  : 超A&G+
+番組名  : ${PGNAME}
+引数    : ${CMDTITLE}
 開始時間: `date '+%Y/%m/%d %H:%M:%S'`
 録音時間: $rec_time" | ~/bin/slack_agqr.sh -h "録音開始: $$"
     rtmpdump -v \
@@ -101,8 +102,9 @@ echo "ファイル名: ${filename}
     #    -o "${filename}"
     RET=$?
 echo "ファイル名: ${filename}
-放送局: 超A&G+
-番組名: ${PGNAME}
+放送局  : 超A&G+
+番組名  : ${PGNAME}
+引数    : ${CMDTITLE}
 終了時間: `date '+%Y/%m/%d %H:%M:%S'`
 録音時間: $rec_time" | ~/bin/slack_agqr.sh -h "録音完了: $$"
     return $RET
@@ -274,11 +276,19 @@ while [ $LOOP_CNT -lt $LOOP_MAX ]; do
     echo "$MP4FILE"
     echo "$M4AFILE"
     echo "$MP3FILE"
+    FLVFILESIZE=''
+    MP4FILESIZE=''
+    M4AFILESIZE=''
+    MP3FILESIZE=''
+    ENC_START=''
+    ENC_END=''
 
     if [ -f "$FLVFILE" ]; then
+        FLVFILESIZE=`ls -lh "$FLVFILE" | awk '{print $5}'`
         # ffmpeg flv->mp4
         echo -n 'ffmpeg flv->mp4 start : '
         date
+        ENC_START=`date +%s`
         /usr/local/bin/ffmpeg \
           -y -i "$FLVFILE" \
           -metadata artist=${PGPRLTY} \
@@ -298,6 +308,7 @@ ${CMDTITLE}" \
         RETVAL2=$?
         echo "ffmpeg RETVAL2 = $RETVAL2"
         echo -n 'ffmpeg flv->mp4 end   : '
+        MP4FILESIZE=`ls -lh "$MP4FILE" | awk '{print $5}'`
         date
         echo ''
 
@@ -326,6 +337,8 @@ ${CMDTITLE}" \
         RETVAL3=$?
         echo "ffmpeg RETVAL3 = $RETVAL3"
         echo -n 'ffmpeg flv->m4a end   : '
+        M4A_SIZE=`ls -l "$M4AFILE" | awk '{ print $5}'`
+        M4AFILESIZE=`ls -lh "$M4AFILE" | awk '{print $5}'`
         date
         echo ''
 
@@ -349,31 +362,48 @@ ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒
 パーソナリティ: ${PGPRLTY}
 ${NAME}
 ${CMDTITLE}" \
-              -vn -ab 96k -ar 22050  -acodec libmp3lame \
+              -vn -acodec libmp3lame -ar 22050 -q:a 8 \
               "$MP3FILE"
 
             RETVAL4=$?
             echo "ffmpeg RETVAL4 = $RETVAL4"
             echo -n 'ffmpeg m4a->mp3 end   : '
+            MP3FILESIZE=`ls -lh "$MP3FILE" | awk '{print $5}'`
             date
+            ENC_END=`date +%s`
             echo ''
-            rm "$M4AFILE"
+            #rm "$M4AFILE"
         fi
 
         FLV_SIZE=`ls -l "$FLVFILE" | awk '{ print $5}'`
         MP4_SIZE=`ls -l "$MP4FILE" | awk '{ print $5}'`
-        RATIO=`perl -e "printf(\"%d\n\", ($MP4_SIZE / $FLV_SIZE * 100) + 0.5);"`
-        echo RATIO=$RATIO  FLV_SIZE=$FLV_SIZE  MP4_SIZE=$MP4_SIZE
+        MP4_RATE=`perl -e "printf(\"%d\n\", ($MP4_SIZE / $FLV_SIZE * 100) + 0.5);"`
+        MP3_SIZE=`ls -l "$MP3FILE" | awk '{ print $5}'`
+        MP3_RATE=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $M4A_SIZE * 100) + 0.5);"`
+        echo MP4_RATE=$MP4_RATE  FLV_SIZE=$FLV_SIZE  MP4_SIZE=$MP4_SIZE
         echo MAX=$MAX  MIN=$MIN
+        echo MP3_RATE=$MP3_RATE  M4A_SIZE=$M4A_SIZE  MP3_SIZE=$MP3_SIZE
 
         if [ $RETVAL1 -eq 0 -a $RETVAL2 -eq 0 ]; then
-            if [ $RATIO -le $MAX -a $RATIO -ge $MIN ]; then
+            if [ $MP4_RATE -le $MAX -a $MP4_RATE -ge $MIN ]; then
                 echo "rm $FLVFILE"
                 rm "$FLVFILE"
             else
                 echo "rm skip."
             fi
         fi
+        echo "エンコード結果
+LOOP_CNT / LOOP_MAX: ${LOOP_CNT} / ${LOOP_MAX}
+終了時間: `date '+%Y/%m/%d %H:%M:%S'`
+エンコード時間 : `expr $ENC_END - $ENC_START`
+番組名  : ${PGNAME}
+引数    : ${CMDTITLE}
+FLVFILE : `basename "${FLVFILE}"` : ${FLVFILESIZE}
+MP4FILE : `basename "${MP4FILE}"` : ${MP4FILESIZE}
+M4AFILE : `basename "${M4AFILE}"` : ${M4AFILESIZE}
+MP3FILE : `basename "${MP3FILE}"` : ${MP3FILESIZE}
+MP4 RATE: $MP4_RATE :  MAX=$MAX  MIN=$MIN
+MP3 RATE: $MP3_RATE " | ~/bin/slack_agqr.sh -h "エンコード結果: $$"
     fi
     LOOP_CNT=$LOOP_CNT+1
 done
