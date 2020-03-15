@@ -220,7 +220,8 @@ rec() {
         #TITLE2=`~/bin/radiko_prog.php -s $ST -nt`
         echo "放送局: $STATION($ST)
 ファイル名: ${filename}
-番組名: ${PGNAME}
+番組名  : ${PGNAME}
+引数    : ${CMDTITLE}
 開始時間: `date '+%Y/%m/%d %H:%M:%S'`
 録音時間: $rec_time" | ~/bin/slack_radiko.sh -h "録音開始: $$"
         rtmpdump -v \
@@ -236,7 +237,8 @@ rec() {
         RET=$?
         echo "放送局: $STATION($ST)
 ファイル名: ${filename}
-番組名: ${PGNAME}
+番組名  : ${PGNAME}
+引数    : ${CMDTITLE}
 終了時間: `date '+%Y/%m/%d %H:%M:%S'`
 録音時間: $rec_time" | ~/bin/slack_radiko.sh -h "録音完了: $$"
     fi
@@ -407,8 +409,14 @@ while [ $LOOP_CNT -lt $LOOP_MAX ]; do
     MP3FILE="${MP3S[$LOOP_CNT]}"
     echo "$FLVFILE"
     echo "$MP3FILE"
+    FLVFILESIZE=''
+    MP3FILESIZE=''
+    ENC_START=''
+    ENC_END=''
 
     if [ -f "$FLVFILE" ]; then
+        ENC_START=`date +%s`
+        FLVFILESIZE=`ls -lh "$FLVFILE" | awk '{print $5}'`
         /usr/local/bin/ffmpeg \
           -y -i "$FLVFILE" \
           -metadata StreamTitle="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
@@ -424,21 +432,23 @@ ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒
 番組タイトル  : ${PGTITLE}
 パーソナリティ: ${PGPRLTY}
 ${CMDTITLE}" \
-          -aq 9 -ar 22050 -ac 2 -acodec libmp3lame "$MP3FILE"
+          -vn -acodec libmp3lame -ar 22050 -ac 2 -q:a 9 "$MP3FILE"
         RETVAL2=$?
         echo "ffmpeg RETVAL2 = $RETVAL2"
         echo -n ffmpeg end   :
+        MP3FILESIZE=`ls -lh "$MP3FILE" | awk '{print $5}'`
         date
+        ENC_END=`date +%s`
         echo ''
 
         FLV_SIZE=`ls -l "$FLVFILE" | awk '{ print $5}'`
         MP3_SIZE=`ls -l "$MP3FILE" | awk '{ print $5}'`
-        RATIO=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $FLV_SIZE * 100) + 0.5);"`
-        echo RATIO=$RATIO  FLV_SIZE=$FLV_SIZE  MP3_SIZE=$MP3_SIZE
+        RATE=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $FLV_SIZE * 100) + 0.5);"`
+        echo RATE=$RATE  FLV_SIZE=$FLV_SIZE  MP3_SIZE=$MP3_SIZE
         echo MAX=$MAX  MIN=$MIN
 
         if [ $RETVAL1 -eq 0 -a $RETVAL2 -eq 0 ]; then
-            if [ $RATIO -le $MAX -a $RATIO -ge $MIN ]; then
+            if [ $RATE -le $MAX -a $RATE -ge $MIN ]; then
                 #echo true
                 echo "rm $FLVFILE"
                 rm "$FLVFILE"
@@ -447,6 +457,16 @@ ${CMDTITLE}" \
                 echo "rm skip."
             fi
         fi
+        echo "エンコード結果
+LOOP_CNT / LOOP_MAX: ${LOOP_CNT} / ${LOOP_MAX}
+終了時間  : `date '+%Y/%m/%d %H:%M:%S'`
+エンコード時間 : `expr $ENC_END - $ENC_START`
+ファイル名: ${FLVFILE}
+番組名    : ${PGNAME}
+引数      : ${CMDTITLE}
+FLVFILE   : `basename "${FLVFILE}"` : ${FLVFILESIZE}
+MP3FILE   : `basename "${MP3FILE}"` : ${MP3FILESIZE}
+RATE      : ${RATE} : MAX=$MAX  MIN=$MIN" | ~/bin/slack_radiko.sh -h "エンコード結果: $$"
     fi
     LOOP_CNT=$LOOP_CNT+1
 done
