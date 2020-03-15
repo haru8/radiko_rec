@@ -134,21 +134,21 @@ function showProgram($progs, $dateTime, $ton, $pon)
 function showRow($parm, $ton, $pon)
 {
     if ($ton && $pon) {
-        $program = mb_strimwidth($parm['title'], 0, 200, '...');
-        $pfm     = mb_strimwidth($parm['pfm'],   0, 200, '...');
+        $program = mb_strimwidth($parm['title'], 0, 150, '~');
+        $pfm     = mb_strimwidth($parm['pfm'],   0, 150, '~');
         if ($pfm) {
             $program .=  '(' . $pfm . ')';
         }
-        echo mb_strimwidth($program, 0, 200, '...');
+        echo mb_strimwidth($program, 0, 150, '~');
         echo PHP_EOL;
     } else if ($ton) {
-        $program = mb_strimwidth($parm['title'], 0, 200, '...');
+        $program = mb_strimwidth($parm['title'], 0, 150, '~');
         echo $program;
         echo PHP_EOL;
     } else if ($pon) {
-        $pfm = mb_strimwidth($parm['pfm'],   0, 200, '...');
+        $pfm = mb_strimwidth($parm['pfm'],   0, 150, '~');
         if ($pfm) {
-            echo mb_strimwidth($pfm, 0, 200, '...');
+            echo mb_strimwidth($pfm, 0, 150, '~');
             echo PHP_EOL;
         }
     } else {
@@ -156,7 +156,7 @@ function showRow($parm, $ton, $pon)
         if ($parm['pfm']) {
             $program .=  '(' . $parm['pfm'] . ')';
         }
-        $program = mb_strimwidth($program, 0, 200, '...');
+        $program = mb_strimwidth($program, 0, 150, '~');
         echo $parm['ft']. ' ' . $parm['to'] . ' ' . $parm['ftl'] . ' ' . $parm['tol'] . ' ' . $parm['dur'] . ' ' . $program;
         echo PHP_EOL;
     }
@@ -172,8 +172,8 @@ function _trim($str)
     $str = preg_replace('/[\n\r\t]/', ' ', $str);
     $str = preg_replace('/\s{2,}/', ' ', $str);
 
-    $patterns     = array('/\?/', '/!/', '/\*/', '/\\\/', '/\//', '/:/', '/;/', '/"/', '/\</', '/\>/', '/\|/' );
-    $replacements = array('？'  , '！' , '＊'  , '￥'   , '／'  , '：' , '；' , '\'' , '＜'  , '＞'  , '｜') ;
+    $patterns     = array('/\?/', '/\*/', '/\\\/', '/\//', '/:/', '/"/', '/\</', '/\>/', '/\|/' );
+    $replacements = array('？'  , '＊'  , '￥'   , '／'  , '：' , '\'' , '＜'  , '＞'  , '｜') ;
     $str = preg_replace($patterns, $replacements, $str);
 
     return $str;
