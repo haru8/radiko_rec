@@ -372,7 +372,7 @@ ${CMDTITLE}" \
             date
             ENC_END=`date +%s`
             echo ''
-            #rm "$M4AFILE"
+            rm "$M4AFILE"
         fi
 
         FLV_SIZE=`ls -l "$FLVFILE" | awk '{ print $5}'`
