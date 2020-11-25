@@ -7,15 +7,8 @@ export PATH=/usr/lib/qt-3.3/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH
 
-#SERVER_NAME1="rtmp://fms-base1.mitene.ad.jp/agqr/aandg2"
-#SERVER_NAME2="rtmp://fms-base2.mitene.ad.jp/agqr/aandg2"
-#SERVER_NAME1="rtmp://fms-base1.mitene.ad.jp/agqr/aandg11"
-#SERVER_NAME2="rtmp://fms-base2.mitene.ad.jp/agqr/aandg11"
-SERVER_NAME1="rtmp://fms-base1.mitene.ad.jp/agqr/"
-SERVER_NAME2="rtmp://fms-base2.mitene.ad.jp/agqr/"
-PLAYPATH1="aandg333"
-PLAYPATH2="aandg1"
-PLAYPATH3="aandg1"
+REC_URL_HOST="https://fms2.uniqueradio.jp/"
+REC_URL_PATH="agqr10/aandg1.m3u8"
 BASE=/home/haru/radiko_rec
 ALLARG="$@"
 RUN_DATE=`date '+%Y/%m/%d %H:%M:%S'`
@@ -48,35 +41,18 @@ time_check() {
 }
 
 #
-# rtmpdump
+# rec
 #  $1
 #  $2
 rec() {
     local rec_time=$1
     local filename="$2"
-    local -i snum=$RANDOM%2+1
-    #local -i pnum=$RANDOM%2+1
     local -i pnum=`seq 1 3 | shuf | head -1`
 
-    if [ $snum -eq 1 ]; then
-        SERVER_NAME=$SERVER_NAME1
-    else
-        SERVER_NAME=$SERVER_NAME2
-    fi
+    SERVER_NAME=${REC_URL_HOST}${REC_URL_PATH}
 
     echo *=======================*
     echo pnum = $pnum
-    echo *=======================*
-    #if [ $pnum -eq 1 ]; then
-    #    PLAYPATH=$PLAYPATH1
-    #elif [ $pnum -eq 2 ]; then
-    #    PLAYPATH=$PLAYPATH2
-    #else
-    #    PLAYPATH=$PLAYPATH3
-    #fi
-    PLAYPATH=$PLAYPATH1
-    SERVER_NAME="${SERVER_NAME}${PLAYPATH}"
-    echo *=======================*
     echo SERVER_NAME = $SERVER_NAME
     echo *=======================*
 
@@ -86,20 +62,27 @@ echo "ファイル名: ${filename}
 引数    : ${CMDTITLE}
 開始時間: `date '+%Y/%m/%d %H:%M:%S'`
 録音時間: $rec_time" | ~/bin/slack_agqr.sh -h "録音開始: $$"
-    rtmpdump -v \
-        -r "${SERVER_NAME}" \
-        --live \
-        --stop $rec_time \
-        -m 10 \
-        -o "${filename}"
-    #rtmpdump -v \
-    #    --rtmp     "rtmpe://fms2.uniqueradio.jp/" \
-    #    --playpath "aandg22" \
-    #    --app      "?rtmp://fms-base1.mitene.ad.jp/agqr/" \
-    #    --live \
-    #    --stop $rec_time \
-    #    -m 30 \
-    #    -o "${filename}"
+
+    /usr/local/bin/ffmpeg -i \
+      "${SERVER_NAME}"       \
+      -t $rec_time           \
+      -movflags faststart    \
+      -acodec copy           \
+      -vcodec copy           \
+      -bsf:a aac_adtstoasc   \
+      -metadata artist=${PGPRLTY}  \
+      -metadata title="${PGNAME}"  \
+      -metadata album="${PGTITLE}" \
+      -metadata genre="ラジオ"     \
+      -metadata date="${YEAR}"     \
+      -metadata comment="超A&G+
+${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒
+番組タイトル  : ${PGTITLE}
+パーソナリティ: ${PGPRLTY}
+${NAME}
+${CMDTITLE}" \
+      "${filename}"
+
     RET=$?
 echo "ファイル名: ${filename}
 放送局  : 超A&G+
@@ -206,12 +189,8 @@ create_filename() {
 
     REC_MIN=$STOP/60
     REC_SEC="$STOP-($REC_MIN*60)"
-    FLV="${FILE}.flv"
-    FLVS+=("$FLV")
     MP4="${FILE}.mp4"
     MP4S+=("$MP4")
-    M4A="${FILE}.m4a"
-    M4AS+=("$M4A")
     MP3="${FILE}.mp3"
     MP3S+=("$MP3")
 
@@ -222,9 +201,7 @@ create_filename() {
     echo 'STOP     :' $STOP
     echo 'YMD      :' $YMD
     echo 'DIR      :' $DIR
-    echo 'FLV      :' $FLV
     echo 'MP4      :' $MP4
-    echo 'M4A      :' $M4A
     echo 'MP3      :' $MP3
     echo ''
 }
@@ -239,7 +216,6 @@ declare -i STOP
 declare -i REC_CNT=1
 declare -i REC_MAX=30
 RETVAL1=10
-#while [ ! -s "$FLV" -a $RETVAL1 != 0 ]; do
 while [ $RETVAL1 != 0 ]; do
     echo -n rec start :
     date
@@ -247,7 +223,7 @@ while [ $RETVAL1 != 0 ]; do
     echo "REC_CNT = $REC_CNT"
     echo ''
 
-    rec $STOP "$FLV"
+    rec $STOP "$MP4"
     RETVAL1=$?
     echo "rec RETVAL1 = $RETVAL1"
     echo ''
@@ -260,7 +236,7 @@ done
 # 容量0のファイルを削除
 find $BASE/ -type f -size 0 -print0 -exec rm {} \;
 
-declare -i LOOP_MAX="${#FLVS[@]}"
+declare -i LOOP_MAX="${#MP4S[@]}"
 declare -i LOOP_CNT=0
 MAX='101'
 MIN='97'
@@ -268,94 +244,33 @@ echo LOOP_MAX=$LOOP_MAX
 while [ $LOOP_CNT -lt $LOOP_MAX ]; do
     echo LOOP_CNT=$LOOP_CNT
 
-    FLVFILE="${FLVS[$LOOP_CNT]}"
     MP4FILE="${MP4S[$LOOP_CNT]}"
-    M4AFILE="${M4AS[$LOOP_CNT]}"
     MP3FILE="${MP3S[$LOOP_CNT]}"
-    echo "$FLVFILE"
     echo "$MP4FILE"
-    echo "$M4AFILE"
     echo "$MP3FILE"
-    FLVFILESIZE=''
     MP4FILESIZE=''
-    M4AFILESIZE=''
     MP3FILESIZE=''
     ENC_START=''
     ENC_END=''
 
-    if [ -f "$FLVFILE" ]; then
-        FLVFILESIZE=`ls -lh "$FLVFILE" | awk '{print $5}'`
-        # ffmpeg flv->mp4
-        echo -n 'ffmpeg flv->mp4 start : '
-        date
-        ENC_START=`date +%s`
-        /usr/local/bin/ffmpeg \
-          -y -i "$FLVFILE" \
-          -metadata artist=${PGPRLTY} \
-          -metadata title="${PGNAME}" \
-          -metadata album="${PGTITLE}" \
-          -metadata genre="ラジオ" \
-          -metadata date="${YEAR}" \
-          -metadata comment="超A&G+
-${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒
-番組タイトル  : ${PGTITLE}
-パーソナリティ: ${PGPRLTY}
-${NAME}
-${CMDTITLE}" \
-          -vcodec copy -acodec copy \
-          "$MP4FILE"
-
-        RETVAL2=$?
-        echo "ffmpeg RETVAL2 = $RETVAL2"
-        echo -n 'ffmpeg flv->mp4 end   : '
+    if [ -f "$MP4FILE" ]; then
         MP4FILESIZE=`ls -lh "$MP4FILE" | awk '{print $5}'`
-        date
-        echo ''
 
-        # ffmpeg flv->mp3
-        #echo -n 'ffmpeg flv->mp3 start : '
-        #date
-        #/usr/local/bin/ffmpeg \
-        #  -y -i "$FLVFILE" \
-        #  -ab 96 -ar 22050 -acodec libmp3lame \
-        #  "$MP3FILE"
-        #
-        #RETVAL3=$?
-        #echo "ffmpeg RETVAL3 = $RETVAL3"
-        #echo -n 'ffmpeg flv->mp3 end   : '
-        #date
-        #echo ''
-
-        # ffmpeg flv->m4a
-        echo -n 'ffmpeg flv->m4a start : '
-        date
-        /usr/local/bin/ffmpeg \
-          -y -i "$FLVFILE" \
-          -vn -acodec copy \
-          "$M4AFILE"
-
-        RETVAL3=$?
-        echo "ffmpeg RETVAL3 = $RETVAL3"
-        echo -n 'ffmpeg flv->m4a end   : '
-        M4A_SIZE=`ls -l "$M4AFILE" | awk '{ print $5}'`
-        M4AFILESIZE=`ls -lh "$M4AFILE" | awk '{print $5}'`
-        date
-        echo ''
-
-        # ffmpeg m4a->mp3
-        if [ $RETVAL3 = 0 ]; then
-            echo -n 'ffmpeg m4a->mp3 start : '
+        # ffmpeg mp4 -> mp3
+        if [ $RETVAL1 = 0 ]; then
+            echo -n 'ffmpeg mp4 -> mp3 start : '
             date
+            ENC_START=`date +%s`
             /usr/local/bin/ffmpeg \
-              -y -i "$M4AFILE" \
+              -y -i "$MP4FILE"    \
               -metadata StreamTitle="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
-              -metadata author="超A&G+" \
-              -metadata artist=${PGPRLTY} \
-              -metadata title="${PGNAME}" \
+              -metadata author="超A&G+"    \
+              -metadata artist=${PGPRLTY}  \
+              -metadata title="${PGNAME}"  \
               -metadata album="${PGTITLE}" \
-              -metadata genre="ラジオ" \
-              -metadata year="${YEAR}" \
-              -metadata date="${YEAR}" \
+              -metadata genre="ラジオ"     \
+              -metadata year="${YEAR}"     \
+              -metadata date="${YEAR}"     \
               -metadata comment="超A&G+
 ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒
 番組タイトル  : ${PGTITLE}
@@ -365,45 +280,30 @@ ${CMDTITLE}" \
               -vn -acodec libmp3lame -ar 22050 -q:a 8 \
               "$MP3FILE"
 
-            RETVAL4=$?
-            echo "ffmpeg RETVAL4 = $RETVAL4"
-            echo -n 'ffmpeg m4a->mp3 end   : '
+            RETVAL2=$?
+            echo "ffmpeg RETVAL2 = $RETVAL2"
+            echo -n 'ffmpeg mp4 -> mp3 end   : '
             MP3FILESIZE=`ls -lh "$MP3FILE" | awk '{print $5}'`
             date
             ENC_END=`date +%s`
             echo ''
-            rm "$M4AFILE"
         fi
 
-        FLV_SIZE=`ls -l "$FLVFILE" | awk '{ print $5}'`
         MP4_SIZE=`ls -l "$MP4FILE" | awk '{ print $5}'`
-        MP4_RATE=`perl -e "printf(\"%d\n\", ($MP4_SIZE / $FLV_SIZE * 100) + 0.5);"`
         MP3_SIZE=`ls -l "$MP3FILE" | awk '{ print $5}'`
-        MP3_RATE=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $M4A_SIZE * 100) + 0.5);"`
-        echo MP4_RATE=$MP4_RATE  FLV_SIZE=$FLV_SIZE  MP4_SIZE=$MP4_SIZE
+        MP3_RATE=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $MP4_SIZE * 100) + 0.5);"`
         echo MAX=$MAX  MIN=$MIN
-        echo MP3_RATE=$MP3_RATE  M4A_SIZE=$M4A_SIZE  MP3_SIZE=$MP3_SIZE
+        echo MP3_RATE=$MP3_RATE  MP4_SIZE=$MP4_SIZE  MP3_SIZE=$MP3_SIZE
 
-        if [ $RETVAL1 -eq 0 -a $RETVAL2 -eq 0 ]; then
-            if [ $MP4_RATE -le $MAX -a $MP4_RATE -ge $MIN ]; then
-                echo "rm $FLVFILE"
-                rm "$FLVFILE"
-            else
-                echo "rm skip."
-            fi
-        fi
         echo "エンコード結果
 LOOP_CNT / LOOP_MAX: ${LOOP_CNT} / ${LOOP_MAX}
 終了時間: `date '+%Y/%m/%d %H:%M:%S'`
 エンコード時間 : `expr $ENC_END - $ENC_START`
 番組名  : ${PGNAME}
 引数    : ${CMDTITLE}
-FLVFILE : `basename "${FLVFILE}"` : ${FLVFILESIZE}
 MP4FILE : `basename "${MP4FILE}"` : ${MP4FILESIZE}
-M4AFILE : `basename "${M4AFILE}"` : ${M4AFILESIZE}
 MP3FILE : `basename "${MP3FILE}"` : ${MP3FILESIZE}
-MP4 RATE: $MP4_RATE :  MAX=$MAX  MIN=$MIN
-MP3 RATE: $MP3_RATE " | ~/bin/slack_agqr.sh -h "エンコード結果: $$"
+MP3 RATE: $MP3_RATE :  MAX=$MAX  MIN=$MIN " | ~/bin/slack_agqr.sh -h "エンコード結果: $$"
     fi
     LOOP_CNT=$LOOP_CNT+1
 done
