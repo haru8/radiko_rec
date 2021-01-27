@@ -3,25 +3,20 @@
 # history
 #
 
-# 配信サーバーはxmlから取るようにしたい。
-# http://radiko.jp/v2/station/stream/QRR.xml
-# http://radiko.jp/v2/station/stream_multi/QRR.xml
-
 export PATH=/usr/lib/qt-3.3/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/home/${HOME}/bin
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH
 
 BASE=/home/haru/radiko_rec
-SERVER_NAME='rtmpe://f-radiko.smartstream.ne.jp'
-SERVER_PORT=1935
-PLAYERURL=http://radiko.jp/player/swf/player_3.0.0.01.swf
-PLAYPATH='simul-stream.stream'
-PLAYERFILE="${HOME}/bin/player.swf"
-KEYFILE="${HOME}/bin/authkey.png"
-AUTHFILE1="${HOME}/bin/auth1_fms.$$"
-AUTHFILE2="${HOME}/bin/auth2_fms.$$"
-AUTHFILE1URL=https://radiko.jp/v2/api/auth1_fms
-AUTHFILE2URL=https://radiko.jp/v2/api/auth2_fms
+AUTHFILE1="/tmp/auth1_fms.$$"
+AUTHFILE2="/tmp/auth2_fms.$$"
+AUTHFILE1URL=https://radiko.jp/v2/api/auth1
+AUTHFILE2URL=https://radiko.jp/v2/api/auth2
+STREAM_URl_BASE=http://radiko.jp/v2/station/stream_smh_multi
+
+# Define authorize key value ( from http://radiko.jp/apps/js/playerCommon.js )
+RADIKO_AUTHKEY_VALUE="bcd151073c03b352e1ef2fd66c32209da9ca0afa"
+
 
 ALLARG="$@"
 ARGC=$#
@@ -53,9 +48,6 @@ usage() {
     echo "            NHK第二放送     : JOAB" >&2
     echo "            NHK FM          : JOAK-FM" >&2
     echo ""
-    echo "            東海ラジオ      : TOKAIRADIO" >&2
-    echo "            レディオキューブFM三重 : FMMIE" >&2
-    echo "            CBCラジオ       : CBC" >&2
     echo "  time      Stop at num seconds into stream" >&2
     echo "  name      output file name" >&2
 }
@@ -107,44 +99,20 @@ time_check() {
 
 # 認証キー取得
 get_auth() {
-    #
-    # get player
-    #
-    if [ ! -s $PLAYERFILE ]; then
-        wget -q -O $PLAYERFILE $PLAYERURL
-
-        if [ $? -ne 0 ]; then
-            echo "failed get player"
-            return 1
-        fi
-    fi
-
-    #
-    # get keydata (need swftools)
-    #
-    if [ ! -s $KEYFILE ]; then
-        swfextract -b 14 $PLAYERFILE -o $KEYFILE
-
-        if [ ! -s $KEYFILE ]; then
-            echo "failed get keydata"
-            return 1
-        fi
-    fi
 
     if [ -f $AUTHFILE1 ]; then
         rm -f $AUTHFILE1
     fi
 
     #
-    # access auth1_fms
+    # access auth1
     #
     wget -q \
         --header="pragma: no-cache" \
-        --header="X-Radiko-App: pc_1" \
-        --header="X-Radiko-App-Version: 2.0.1" \
+        --header="X-Radiko-App: pc_html5" \
+        --header="X-Radiko-App-Version: 0.0.1" \
         --header="X-Radiko-User: test-stream" \
         --header="X-Radiko-Device: pc" \
-        --post-data='\r\n' \
         --no-check-certificate \
         --save-headers \
         -O $AUTHFILE1 \
@@ -158,54 +126,49 @@ get_auth() {
     #
     # get partial key
     #
-    AUTHTOKEN=`cat $AUTHFILE1 | perl -ne 'print $1 if(/x-radiko-authtoken: ([\w-]+)/i)'`
-    local offset=`cat $AUTHFILE1 | perl -ne 'print $1 if(/x-radiko-keyoffset: (\d+)/i)'`
-    local length=`cat $AUTHFILE1 | perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)'`
+    AUTHTOKEN=`cat ${AUTHFILE1} | perl -ne 'print $1 if(/x-radiko-authtoken: ([\w-]+)/i)'`
+    local offset=`cat ${AUTHFILE1} | perl -ne 'print $1 if(/x-radiko-keyoffset: (\d+)/i)'`
+    local length=`cat ${AUTHFILE1} | perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)'`
+    local partialkey=`echo "${RADIKO_AUTHKEY_VALUE}" | dd bs=1 "skip=${offset}" "count=${length}" 2> /dev/null | base64`
 
-    local partialkey=`dd if=$KEYFILE bs=1 skip=${offset} count=${length} 2> /dev/null | base64`
+    echo -e "authtoken: ${AUTHTOKEN} \noffset: ${offset} length: ${length} \npartialkey: ${partialkey}"
 
-    echo "authtoken: ${AUTHTOKEN} \noffset: ${offset} length: ${length} \npartialkey: $partialkey"
+    rm -f ${AUTHFILE1}
 
-    rm -f $AUTHFILE1
-
-    if [ -f $AUTHFILE2 ]; then
-        rm -f $AUTHFILE2
+    if [ -f ${AUTHFILE2} ]; then
+        rm -f ${AUTHFILE2}
     fi
 
     #
-    # access auth2_fms
+    # access auth2
     #
     wget -q \
          --header="pragma: no-cache" \
-         --header="X-Radiko-App: pc_1" \
-         --header="X-Radiko-App-Version: 2.0.1" \
          --header="X-Radiko-User: test-stream" \
          --header="X-Radiko-Device: pc" \
          --header="X-Radiko-Authtoken: ${AUTHTOKEN}" \
          --header="X-Radiko-Partialkey: ${partialkey}" \
-         --post-data='\r\n' \
          --no-check-certificate \
-         -O $AUTHFILE2 \
-         $AUTHFILE2URL
+         -O ${AUTHFILE2} \
+         ${AUTHFILE2URL}
 
-    if [ $? -ne 0 -o ! -f $AUTHFILE2 ]; then
+    if [ $? -ne 0 -o ! -f ${AUTHFILE2} ]; then
         echo "failed auth2 process"
         return 1
     fi
 
     echo "authentication success"
 
-    areaid=`cat $AUTHFILE2 | perl -ne 'print $1 if(/^([^,]+),/i)'`
+    areaid=`cat ${AUTHFILE2} | perl -ne 'print $1 if(/^([^,]+),/i)'`
     echo "areaid: $areaid"
-    echo ''
 
-    rm -f $AUTHFILE2
+    rm -f ${AUTHFILE2}
     return 0
 }
 
 
 #
-# rtmpdump
+# rec
 #  $1
 #  $2
 #  $3
@@ -216,25 +179,36 @@ rec() {
 
     get_auth
     if [ $? = 0 ]; then
-        #TITLE=`~/bin/radiko_prog.php -s $ST -n`
-        #TITLE2=`~/bin/radiko_prog.php -s $ST -nt`
+
+        STATION_XML=/tmp/${station}.xml
+        if [ -f ${STATION_XML} ]; then
+            rm -f ${STATION_XML}
+        fi
+        wget -q ${STREAM_URl_BASE}/${station}.xml -O ${STATION_XML}
+        STREAM_URL=`xmllint --xpath "/urls/url[@areafree='0'][1]/playlist_create_url/text()" ${STATION_XML}`
+        rm -f ${STATION_XML}
+        echo "stream_url: ${STREAM_URL}"
+
         echo "放送局: $STATION($ST)
 ファイル名: ${filename}
 番組名  : ${PGNAME}
 引数    : ${CMDTITLE}
 開始時間: `date '+%Y/%m/%d %H:%M:%S'`
 録音時間: $rec_time" | ~/bin/slack_radiko.sh -h "録音開始: $$"
-        rtmpdump -v \
-            -r "$SERVER_NAME" \
-            --playpath $PLAYPATH \
-            --app "${station}/_definst_" \
-            -W $PLAYERURL \
-            -C S:"" -C S:"" -C S:"" -C S:$AUTHTOKEN \
-            --live \
-            --stop $rec_time \
-            -m 10 \
-            -o "${filename}"
+
+        ffmpeg \
+            -loglevel error \
+            -fflags +discardcorrupt \
+            -headers "X-Radiko-Authtoken: ${AUTHTOKEN}" \
+            -i "${STREAM_URL}" \
+            -acodec copy \
+            -vn \
+            -bsf:a aac_adtstoasc \
+            -y \
+            -t ${rec_time} \
+            "${filename}"
         RET=$?
+
         echo "放送局: $STATION($ST)
 ファイル名: ${filename}
 番組名  : ${PGNAME}
@@ -282,7 +256,7 @@ create_filename() {
     create_28date
 
     # 保存ディレクトリ
-    DIR=$BASE/$YMD
+    DIR=${BASE}/${YMD}
 
     # 引数チェック
     ST=$1
@@ -305,18 +279,25 @@ create_filename() {
         PGNAME="${PGTITLE}(${PGPRLTY})"
     fi
 
+    YMD_HMS_CNT=`echo -n "${YMD_HMS}"_ | wc -c`
+    STATION_CNT=`echo -n "(${STATION})" | wc -c`
+    STOP_CNT=`echo -n "_${STOP}" | wc -c`
+    STR_CNT=`expr + ${YMD_HMS_CNT} + ${STATION_CNT} + ${STOP_CNT}`
+    FILENAME_STR_MAX=`expr 250 - ${STR_CNT}`
+    PGNAME=`php -r "echo mb_strcut(\"${PGNAME}\", 0, ${FILENAME_STR_MAX});"`
+
     if [ $# = 2 ]; then
         # ファイル名指定なし
         if [ -n "${PGNAME}" ]; then
             NAME="${PGNAME}"
             CMDTITLE=""
             FILEBODY=${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
-            FILEBODY=`php -r "echo substr(\"${FILEBODY}\", 0, 210);"`
-            FILE=$DIR/${FILEBODY}
+            FILEBODY=`php -r "echo mb_strcut(\"${FILEBODY}\", 0, 250);"`
+            FILE=${DIR}/${FILEBODY}
         else
             NAME=""
             CMDTITLE=""
-            FILE=$DIR/${YMD_HMS}_${ST}_${STOP}
+            FILE=${DIR}/${YMD_HMS}_${ST}_${STOP}
         fi
     elif [ $# = 3 ]; then
         # ファイル名指定有り
@@ -324,14 +305,14 @@ create_filename() {
             NAME="${PGNAME}"
             CMDTITLE="$3"
             FILEBODY=${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
-            FILEBODY=`php -r "echo substr(\"${FILEBODY}\", 0, 210);"`
-            FILE=$DIR/${FILEBODY}
+            FILEBODY=`php -r "echo mb_strcut(\"${FILEBODY}\", 0, 250);"`
+            FILE=${DIR}/${FILEBODY}
         else
             NAME="$3"
             CMDTITLE="$3"
             FILEBODY=${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
-            FILEBODY=`php -r "echo substr(\"${FILEBODY}\", 0, 210);"`
-            FILE=$DIR/${FILEBODY}
+            FILEBODY=`php -r "echo mb_strcut(\"${FILEBODY}\", 0, 250);"`
+            FILE=${DIR}/${FILEBODY}
         fi
     else
         usage
@@ -344,8 +325,8 @@ create_filename() {
 
     REC_MIN=$STOP/60
     REC_SEC="$STOP-($REC_MIN*60)"
-    FLV="${FILE}.flv"
-    FLVS+=("${FLV}")
+    M4A="${FILE}.m4a"
+    M4AS+=("${M4A}")
     MP3="${FILE}.mp3"
     MP3S+=("${MP3}")
 
@@ -356,7 +337,7 @@ create_filename() {
     echo 'STOP     :' $STOP
     echo 'YMD      :' $YMD
     echo 'DIR      :' $DIR
-    echo 'FLV      :' $FLV
+    echo 'M4A      :' $M4A
     echo 'MP3      :' $MP3
     echo ''
 }
@@ -372,14 +353,13 @@ declare -i STOP
 declare -i REC_CNT=1
 declare -i REC_MAX=30
 RETVAL1=10
-#while [ ! -s "${FLV}" -a $RETVAL1 != 0 ]; do
 while [ $RETVAL1 != 0 ]; do
     echo -n rec start :
     date
     create_filename "$@"
     echo "REC_CNT = $REC_CNT"
     echo ''
-    rec $ST $STOP "${FLV}"
+    rec $ST $STOP "${M4A}"
     RETVAL1=$?
     echo "rec RETVAL1 = $RETVAL1"
     echo ''
@@ -395,7 +375,7 @@ find $DIR -type f -size 0 -print0 -exec rm {} \;
 #
 # ffmpeg flv->mp3
 #
-declare -i LOOP_MAX="${#FLVS[@]}"
+declare -i LOOP_MAX="${#M4AS[@]}"
 declare -i LOOP_CNT=0
 MAX='120'
 MIN='70'
@@ -405,20 +385,20 @@ while [ $LOOP_CNT -lt $LOOP_MAX ]; do
     echo -n ffmpeg start :
     date
 
-    FLVFILE="${FLVS[$LOOP_CNT]}"
+    M4AFILE="${M4AS[$LOOP_CNT]}"
     MP3FILE="${MP3S[$LOOP_CNT]}"
-    echo "$FLVFILE"
+    echo "$M4AFILE"
     echo "$MP3FILE"
-    FLVFILESIZE=''
+    M4AFILESIZE=''
     MP3FILESIZE=''
     ENC_START=''
     ENC_END=''
 
-    if [ -f "$FLVFILE" ]; then
+    if [ -f "$M4AFILE" ]; then
         ENC_START=`date +%s`
-        FLVFILESIZE=`ls -lh "$FLVFILE" | awk '{print $5}'`
+        M4AFILESIZE=`ls -lh "$M4AFILE" | awk '{print $5}'`
         /usr/local/bin/ffmpeg \
-          -y -i "$FLVFILE" \
+          -y -i "$M4AFILE" \
           -metadata StreamTitle="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
           -metadata author="${STATION}" \
           -metadata artist="${PGPRLTY}" \
@@ -441,17 +421,17 @@ ${CMDTITLE}" \
         ENC_END=`date +%s`
         echo ''
 
-        FLV_SIZE=`ls -l "$FLVFILE" | awk '{ print $5}'`
+        M4A_SIZE=`ls -l "$M4AFILE" | awk '{ print $5}'`
         MP3_SIZE=`ls -l "$MP3FILE" | awk '{ print $5}'`
-        RATE=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $FLV_SIZE * 100) + 0.5);"`
-        echo RATE=$RATE  FLV_SIZE=$FLV_SIZE  MP3_SIZE=$MP3_SIZE
+        RATE=`perl -e "printf(\"%d\n\", ($MP3_SIZE / $M4A_SIZE * 100) + 0.5);"`
+        echo RATE=$RATE  M4A_SIZE=$M4A_SIZE  MP3_SIZE=$MP3_SIZE
         echo MAX=$MAX  MIN=$MIN
 
         if [ $RETVAL1 -eq 0 -a $RETVAL2 -eq 0 ]; then
             if [ $RATE -le $MAX -a $RATE -ge $MIN ]; then
                 #echo true
-                echo "rm $FLVFILE"
-                rm "$FLVFILE"
+                echo "rm $M4AFILE"
+                rm "$M4AFILE"
             else
                 #echo false
                 echo "rm skip."
@@ -461,10 +441,10 @@ ${CMDTITLE}" \
 LOOP_CNT / LOOP_MAX: ${LOOP_CNT} / ${LOOP_MAX}
 終了時間  : `date '+%Y/%m/%d %H:%M:%S'`
 エンコード時間 : `expr $ENC_END - $ENC_START`
-ファイル名: ${FLVFILE}
+ファイル名: ${M4AFILE}
 番組名    : ${PGNAME}
 引数      : ${CMDTITLE}
-FLVFILE   : `basename "${FLVFILE}"` : ${FLVFILESIZE}
+M4AFILE   : `basename "${M4AFILE}"` : ${M4AFILESIZE}
 MP3FILE   : `basename "${MP3FILE}"` : ${MP3FILESIZE}
 RATE      : ${RATE} : MAX=$MAX  MIN=$MIN" | ~/bin/slack_radiko.sh -h "エンコード結果: $$"
     fi
