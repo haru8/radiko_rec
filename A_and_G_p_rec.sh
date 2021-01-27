@@ -165,7 +165,7 @@ create_filename() {
             NAME="${PGNAME}"
             CMDTITLE=""
             FILEBODY=${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
-            FILEBODY=`php -r "echo substr(\"${FILEBODY}\", 0, 210);"`
+            FILEBODY=`php -r "echo mb_strcut(\"${FILEBODY}\", 0, 250);"`
             FILE=$DIR/${FILEBODY}
         else
             NAME=""
@@ -178,13 +178,13 @@ create_filename() {
             NAME="${PGNAME}"
             CMDTITLE="$2"
             FILEBODY=${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
-            FILEBODY=`php -r "echo substr(\"${FILEBODY}\", 0, 210);"`
+            FILEBODY=`php -r "echo mb_strcut(\"${FILEBODY}\", 0, 250);"`
             FILE=$DIR/${FILEBODY}
         else
             NAME="$2"
             CMDTITLE="$2"
             FILEBODY=${YMD_HMS}_${NAME}\(${STATION}\)_${STOP}
-            FILEBODY=`php -r "echo substr(\"${FILEBODY}\", 0, 210);"`
+            FILEBODY=`php -r "echo mb_strcut(\"${FILEBODY}\", 0, 250);"`
             FILE=$DIR/${FILEBODY}
         fi
     else
