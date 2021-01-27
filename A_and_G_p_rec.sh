@@ -152,6 +152,13 @@ create_filename() {
         PGNAME="${PGTITLE}(${PGPRLTY})"
     fi
 
+    YMD_HMS_CNT=`echo -n "${YMD_HMS}"_ | wc -c`
+    STATION_CNT=`echo -n "(${STATION})" | wc -c`
+    STOP_CNT=`echo -n "_${STOP}" | wc -c`
+    STR_CNT=`expr + ${YMD_HMS_CNT} + ${STATION_CNT} + ${STOP_CNT}`
+    FILENAME_STR_MAX=`expr 250 - ${STR_CNT}`
+    PGNAME=`php -r "echo mb_strcut(\"${PGNAME}\", 0, ${FILENAME_STR_MAX});"`
+
     if [ $# = 1 ]; then
         # ファイル名指定なし
         if [ -n "${PGNAME}" ]; then
