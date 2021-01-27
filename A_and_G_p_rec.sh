@@ -7,9 +7,11 @@ export PATH=/usr/lib/qt-3.3/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH
 
+BASE=/home/haru/radiko_rec
+STAY_PS_KILL=/home/haru/tool/radiko_rec/stay_ps_kill.sh
+
 REC_URL_HOST="https://fms2.uniqueradio.jp/"
 REC_URL_PATH="agqr10/aandg1.m3u8"
-BASE=/home/haru/radiko_rec
 ALLARG="$@"
 RUN_DATE=`date '+%Y/%m/%d %H:%M:%S'`
 NOW_DATE=`date '+%Y/%m/%d %H:%M:%S'`
@@ -222,6 +224,8 @@ while [ $RETVAL1 != 0 ]; do
     create_filename "$@"
     echo "REC_CNT = $REC_CNT"
     echo ''
+
+    $STAY_PS_KILL
 
     rec $STOP "$MP4"
     RETVAL1=$?
