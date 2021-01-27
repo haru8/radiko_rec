@@ -152,25 +152,25 @@ foreach ($allProgram as $key => $programVal) {
 function showProgram($prog, $opt)
 {
     if ($opt['titleonly'] && $opt['persoonly']) {
-        $program = mb_strimwidth(_trim($prog['prog'], true), 0, 150, '~');
-        $rp      = mb_strimwidth(_trim($prog['rp'], true), 0, 150, '~');
+        $program = mb_strcut(_trim($prog['prog'], true), 0, 200);
+        $rp      = mb_strcut(_trim($prog['rp'], true), 0, 200);
         if ($opt['persoonly'] && $rp) {
             $program .= '[' . $prog['bgStr'] . ']';
         }
         if ($rp) {
           $program .= '(' . $rp . ')';
         }
-        echo mb_strimwidth($program, 0, 150, '~');
+        echo mb_strcut($program, 0, 200);
         echo PHP_EOL;
     } else if ($opt['titleonly']) {
-        $program = mb_strimwidth(_trim($prog['prog'], true), 0, 150, '~');
+        $program = mb_strcut(_trim($prog['prog'], true), 0, 200);
         echo $program;
         if (_trim($prog['bgStr'])) {
           echo '[' . $prog['bgStr'] . ']';
         }
         echo PHP_EOL;
     } else if ($opt['persoonly']) {
-        $rp      = mb_strimwidth(_trim($prog['rp'], true), 0, 150, '~');
+        $rp      = mb_strcut(_trim($prog['rp'], true), 0, 200);
         if ($rp) {
             echo $rp . PHP_EOL ;
         }

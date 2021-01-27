@@ -134,21 +134,21 @@ function showProgram($progs, $dateTime, $ton, $pon)
 function showRow($parm, $ton, $pon)
 {
     if ($ton && $pon) {
-        $program = mb_strimwidth($parm['title'], 0, 150, '~');
-        $pfm     = mb_strimwidth($parm['pfm'],   0, 150, '~');
+        $program = mb_strcut($parm['title'], 0, 200);
+        $pfm     = mb_strcut($parm['pfm'],   0, 200);
         if ($pfm) {
             $program .=  '(' . $pfm . ')';
         }
-        echo mb_strimwidth($program, 0, 150, '~');
+        echo mb_strcut($program, 0, 200);
         echo PHP_EOL;
     } else if ($ton) {
-        $program = mb_strimwidth($parm['title'], 0, 150, '~');
+        $program = mb_strcut($parm['title'], 0, 200);
         echo $program;
         echo PHP_EOL;
     } else if ($pon) {
-        $pfm = mb_strimwidth($parm['pfm'],   0, 150, '~');
+        $pfm = mb_strcut($parm['pfm'],   0, 200);
         if ($pfm) {
-            echo mb_strimwidth($pfm, 0, 150, '~');
+            echo mb_strcut($pfm, 0, 200);
             echo PHP_EOL;
         }
     } else {
@@ -156,7 +156,7 @@ function showRow($parm, $ton, $pon)
         if ($parm['pfm']) {
             $program .=  '(' . $parm['pfm'] . ')';
         }
-        $program = mb_strimwidth($program, 0, 150, '~');
+        $program = mb_strcut($program, 0, 300);
         echo $parm['ft']. ' ' . $parm['to'] . ' ' . $parm['ftl'] . ' ' . $parm['tol'] . ' ' . $parm['dur'] . ' ' . $program;
         echo PHP_EOL;
     }
