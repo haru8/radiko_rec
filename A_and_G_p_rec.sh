@@ -65,8 +65,9 @@ echo "ファイル名: ${filename}
 開始時間: `date '+%Y/%m/%d %H:%M:%S'`
 録音時間: $rec_time" | ~/bin/slack_agqr.sh -h "録音開始: $$"
 
-    /usr/local/bin/ffmpeg -i \
-      "${SERVER_NAME}"       \
+    /usr/local/bin/ffmpeg    \
+      -i "${SERVER_NAME}"    \
+      -loglevel warning      \
       -t $rec_time           \
       -movflags faststart    \
       -acodec copy           \
@@ -274,6 +275,7 @@ while [ $LOOP_CNT -lt $LOOP_MAX ]; do
             ENC_START=`date +%s`
             /usr/local/bin/ffmpeg \
               -y -i "$MP4FILE"    \
+              -loglevel warning   \
               -metadata StreamTitle="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
               -metadata author="超A&G+"    \
               -metadata artist=${PGPRLTY}  \

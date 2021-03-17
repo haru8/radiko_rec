@@ -197,7 +197,7 @@ rec() {
 録音時間: $rec_time" | ~/bin/slack_radiko.sh -h "録音開始: $$"
 
         ffmpeg \
-            -loglevel error \
+            -loglevel warning \
             -fflags +discardcorrupt \
             -headers "X-Radiko-Authtoken: ${AUTHTOKEN}" \
             -i "${STREAM_URL}" \
@@ -398,7 +398,8 @@ while [ $LOOP_CNT -lt $LOOP_MAX ]; do
         ENC_START=`date +%s`
         M4AFILESIZE=`ls -lh "$M4AFILE" | awk '{print $5}'`
         /usr/local/bin/ffmpeg \
-          -y -i "$M4AFILE" \
+          -y -i "$M4AFILE"  \
+          -loglevel warning \
           -metadata StreamTitle="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
           -metadata author="${STATION}" \
           -metadata artist="${PGPRLTY}" \
