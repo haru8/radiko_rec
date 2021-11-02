@@ -1,6 +1,8 @@
 #!/usr/bin/env php
 <?php
 
+$url = 'https://www.joqr.co.jp/qr/agdailyprogram/';
+
 $options = getopt('dntph');
 $opt = array();
 $opt['today']     = isset($options['d']) ? true : false; // 今日のみ
@@ -9,277 +11,279 @@ $opt['titleonly'] = isset($options['t']) ? true : false; // タイトルのみ
 $opt['persoonly'] = isset($options['p']) ? true : false; // パーソナリティのみ
 $opt['help']      = isset($options['h']) ? true : false; // help
 
-//var_dump($options);
-//die();
-
 if ($opt['help']) {
-    usage($argv);
-    exit(1);
+  usage($argv);
+  exit(1);
 }
 
-$url = 'http://www.agqr.jp/timetable/streaming.html';
-$html = file_get_contents($url);
-$dom = new DOMDocument('1.0', 'UTF-8');
-$html = mb_convert_encoding($html, "HTML-ENTITIES", 'UTF-8');
-$dom->preserveWhiteSpace = false;
-@$dom->loadHTML($html);
-$dom->formatOutput = true;
-
-$xpath = new DOMXPath($dom);
-$xpath->registerNamespace("php", "http://php.net/xpath");
-$xpath->registerPHPFunctions();
-
-$table = $xpath->query('//table[@class="timetb-ag"]')->item(0);
-
-$nowTime = time();
-//$nowTime = mktime(22, 00, 3, 3, 1, 2020); // h, m, s, m, d, y
-//$nowTime = $nowTime + ((60 * 60 * 24) * 0) - (60 * 60 * 0) + 1800;
-//echo $nowTime . PHP_EOL;
-//echo date('Y/m/d H:i:s', $nowTime) . PHP_EOL;
 if ($opt['nowona']) {
-    $opt['today'] = true;
-}
-if ($opt['today']) {
-    $h = date('G', $nowTime); // 時。24時間単位。先頭にゼロを付けない。
-    if ($h <= 4) {
-        $yesterday = strtotime(date('Ymd', $nowTime)) - (60 * 60 * 24);
-        $today_start_time = $yesterday;
-    } else {
-        $today_start_time = strtotime(date('Ymd', $nowTime));
-    }
-    $now_time = $nowTime;
-    $today_end_time = $today_start_time + (24 * 60 * 60) + (4 * 60 * 60);
+  $opt['today'] = true;
+  $nowDt = new DateTimeImmutable();
 }
 
-if ($opt['nowona'] || $opt['today']) {
-    $dw = date('N', $nowTime); // 曜日。数値。1(月曜日)から 7(日曜日)
-    $h  = date('G', $nowTime); // 時。24時間単位。先頭にゼロを付けない。
-    if ($h <= 4) {
-        $from_dw = $dw - 1;
-        $to_dw   = $dw - 1;
-    } else {
-        $from_dw = $dw;
-        $to_dw   = $dw;
-    }
+$program = getDaily($url);
+
+if (!$opt['today']) {
+  $pastDayDt   = new DateTime();
+  $futureDayDt = new DateTime();
+  $dayYmd = [];
+  for($i = 1; $i <= 3; $i++) {
+    $pastDayDt->modify("-1 days");
+    $dayYmd[] = $pastDayDt->format('Ymd');
+    $futureDayDt->modify("+1 days");
+    $dayYmd[] = $futureDayDt->format('Ymd');
+  }
+  sort($dayYmd);
+
+  foreach ($dayYmd as $d) {
+    $daily = getDaily($url . '?date=' . $d);
+    $program = array_merge($program, $daily);
+  }
+  $program = sortByKey('startU', SORT_ASC, $program);
+}
+
+if ($opt['nowona']) {
+  $ret = searchDateTime($program, $nowDt);
+  if (count($ret) == 0) {
+    $ret = [
+      'startDate'   => '',
+      'endDate'     => '',
+      'title'       => '放送休止',
+      'personality' => '',
+      'repeat'      => false,
+      'movie'       => false,
+      'live'        => false,
+    ];
+  }
+  $program = [$ret];
+}
+
+if ($opt['titleonly'] && $opt['persoonly']) {
+  showProgramTitlePersonality($program);
+} else if ($opt['titleonly']) {
+  showProgramTitleOnly($program);
+} else if ($opt['persoonly']) {
+  showProgramPersonalityOnly($program);
 } else {
-    $from_dw = 1;
-    $to_dw   = 7;
-}
-if ($from_dw == 0) {
-    $from_dw = 7;
-}
-if ($to_dw == 0) {
-    $to_dw = 7;
+  showProgram($program);
 }
 
-//echo '$from_dw  =' . $from_dw . PHP_EOL;
-//echo '$to_dw    =' . $to_dw . PHP_EOL;
-
-$allProgram = array();
-$n = 0;
-for ($td = $from_dw; $td <= $to_dw; $td++ ) {
-
-    $day = $xpath->query(".//thead/tr/td[$td]", $table)->item(0)->nodeValue;
-    //echo _trim($day), PHP_EOL;
-
-    if ($opt['nowona']) {
-      $h = date('G', $nowTime);
-//echo '$h   =' . $h . PHP_EOL;
-      if ($h <= 4) {
-        $h = $h + 24;
-      }
-      $h_min = ($h * 60) - 360;
-      $to_min   = $h_min;
-      $from_min = $to_min + 70;
-    } else {
-      $to_min   = 0;
-      $from_min = 1440;
-    }
-//echo '$to_min   =' . $to_min . PHP_EOL;
-//echo '$from_min =' . $from_min . PHP_EOL;
-    for ($tr = $to_min; $tr < $from_min; $tr++ ) {
-        $h         = $xpath->query(".//tbody/tr[$tr]/th", $table)->item(0)->nodeValue;
-        $throwspan = $xpath->query(".//tbody/tr[$tr]/th[$td]/@rowspan", $table)->item(0)->nodeValue;
-        $lengthmin = $xpath->query(".//tbody/tr[$tr]/td[$td]/@rowspan", $table)->item(0)->nodeValue;
-        $bg        = $xpath->query(".//tbody/tr[$tr]/td[$td]/@class", $table)->item(0)->nodeValue;
-        $time      = $xpath->query(".//tbody/tr[$tr]/td[$td]/div[@class=\"time\"]", $table)->item(0)->nodeValue;
-        $prog      = $xpath->query(".//tbody/tr[$tr]/td[$td]/div[@class=\"title-p\"]", $table)->item(0)->nodeValue;
-        $rp        = $xpath->query(".//tbody/tr[$tr]/td[$td]/div[@class=\"rp\"]", $table)->item(0)->nodeValue;
-        $program   = array('td' => $td, 'tr' => $tr, 'prog' => _trim($prog), 'rp' => _trim($rp));
-        if ($program['prog']) {
-            $program['start'] = _start($day, $time);
-            $program['end']   = _end($day, $time, $lengthmin);
-            $program['sec']   = _m2s($lengthmin);
-            $program['bgStr'] = _bg($bg);
-            $time = substr(_trim($time), 0, 5);
-            $start_time = strtotime($program['start'][0]);
-            $end_time   = strtotime($program['end'][0]);
-            $allProgram[$start_time] = $program;
-            $n++;
-        }
-    }
-}
-
-ksort($allProgram);
-foreach ($allProgram as $key => $programVal) {
-    $start_time = strtotime($programVal['start'][0]);
-    $end_time   = strtotime($programVal['end'][0]);
-    if ($opt['nowona'] || $opt['today']) {
-        // 今
-        if ($opt['nowona'] &&
-            ($start_time <= $now_time &&
-             $end_time   >= $now_time)) {
-            showProgram($programVal, $opt);
-            //exit;
-        }
-        // 今日
-        if ($opt['today'] && !$opt['nowona'] &&
-            ($today_start_time <= $start_time &&
-             $today_end_time   >= $start_time)) {
-            showProgram($programVal, $opt);
-        }
-    } else {
-        if (!$opt['nowona'] && !$opt['today']) {
-            $h = date('G', $start_time);
-            if ($h >= 5 && $h <= 6) {
-                echo PHP_EOL;
-            }
-        }
-        showProgram($programVal, $opt);
-    }
-}
-
-function showProgram($prog, $opt)
+function getDaily($url)
 {
-    if ($opt['titleonly'] && $opt['persoonly']) {
-        $program = mb_strcut(_trim($prog['prog'], true), 0, 200);
-        $rp      = mb_strcut(_trim($prog['rp'], true), 0, 200);
-        if ($opt['persoonly'] && $rp) {
-            $program .= '[' . $prog['bgStr'] . ']';
-        }
-        if ($rp) {
-          $program .= '(' . $rp . ')';
-        }
-        echo mb_strcut($program, 0, 200);
-        echo PHP_EOL;
-    } else if ($opt['titleonly']) {
-        $program = mb_strcut(_trim($prog['prog'], true), 0, 200);
-        echo $program;
-        if (_trim($prog['bgStr'])) {
-          echo '[' . $prog['bgStr'] . ']';
-        }
-        echo PHP_EOL;
-    } else if ($opt['persoonly']) {
-        $rp      = mb_strcut(_trim($prog['rp'], true), 0, 200);
-        if ($rp) {
-            echo $rp . PHP_EOL ;
-        }
-    } else {
-        $startDay = date('Y/m/d', strtotime($prog['start'][0]));
-//printf('td=%d tr=%04d ', $prog['td'], $prog['tr']);
-        echo $startDay, ' ', _weekDay($prog['start'][0]), ' ', $prog['start'][1], ' ', $prog['end'][1], ' ', sprintf("%4d", $prog['sec']), ' ',  $prog['bgStr'], ' ',  _trim($prog['prog'], true);
-        if (_trim($prog['rp'], true)) {
-            echo '(', $prog['rp'], ')';
-        }
-        echo PHP_EOL;
-    }
+  $dom = new DOMDocument;
+  $dom->preserveWhiteSpace = false;
+  @$dom->loadHTML(mb_convert_encoding(file_get_contents($url), 'HTML-ENTITIES', 'UTF-8'));
+
+  $xpath = new DOMXPath($dom);
+
+  $date = $xpath->query('//h3[@class="heading_date"]/span[@class="heading_date-text"]')->item(0)->nodeValue;
+  $dof  = $xpath->query('//h3[@class="heading_date"]/span[@class="heading_date-text"]/span[@class="heading_date-small"]')->item(0)->nodeValue;
+  $date = str_replace($dof, '', $date);
+  $date = _trim($date);
+  $dt = new DateTimeImmutable($date);
+
+  $dailyProgramAgR  = $xpath->query('//article[@class="dailyProgram-itemBox ag is-repeat"]');
+  $dailyProgramAg   = $xpath->query('//article[@class="dailyProgram-itemBox ag"]');
+  $dailyProgram     = $xpath->query('//article[@class="dailyProgram-itemBox "]');
+  $dailyProgramJoqr = $xpath->query('//article[@class="dailyProgram-itemBox joqr"]');
+
+  $p1 = getProgram($xpath, $dailyProgramAgR, $dt);
+  $p1r = [];
+  foreach ($p1 as $key => $val) {
+    $p1r[$key] = array_merge($val, ['repeat' => true]);
+  }
+  $p2 = getProgram($xpath, $dailyProgramAg, $dt);
+  $p2r = [];
+  foreach ($p2 as $key => $val) {
+    $p2r[$key] = array_merge($val, ['repeat' => false]);
+  }
+  $p3 = getProgram($xpath, $dailyProgram, $dt);
+  $p4 = getProgram($xpath, $dailyProgramJoqr, $dt);
+
+  $program = array_merge($p1r, $p2r, $p3, $p4);
+  $program = sortByKey('startU', SORT_ASC, $program);
+
+  return $program;
 }
 
-function _trim($str, $slash = false)
+function getProgram($xpath, $dailyProgram, $dt)
 {
-    $str = mb_convert_kana($str, 'sanrK');
-    $str = trim($str);
-    $str = preg_replace('/[\n\r\t]/', '', $str);
-    $str = preg_replace('/\s{2,}/', '', $str);
+  $programs = [];
 
-    $patterns     = array('/\?/', '/\*/', '/"/', '/\|/', '/\</', '/\>/', '/\\\/');
-    $replacements = array('？'  , '＊'  , '\'' , '｜'  , '＜'  , '＞'  , '￥'   );
-    if ($slash) {
-      $patterns     = array_merge($patterns,     array('/\//', '/:/'));
-      $replacements = array_merge($replacements, array('／'  , '：' ));
+  foreach ($dailyProgram as $node) {
+    $time  = $xpath->query('.//h3[@class="dailyProgram-itemHeaderTime"]', $node)->item(0)->nodeValue;
+    $times = explode(' ', _trim($time));
+    $s = explode(':', _trim($times[0]));
+    $e = explode(':', _trim($times[2]));
+    $startDate = $dt->add(new DateInterval('PT' . _trim($s[0]) . 'H' . (_trim($s[1]) == '00' ? '' : _trim($s[1]) . 'M')));
+    $endDate   = $dt->add(new DateInterval('PT' . _trim($e[0]) . 'H' . (_trim($e[1]) == '00' ? '' : _trim($e[1]) . 'M')));
+
+    $title = $xpath->query('.//p[@class="dailyProgram-itemTitle"]/a', $node)->item(0)->nodeValue;
+    $movieV = $xpath->query('.//p[@class="dailyProgram-itemTitle"]/a/i[@class="icon_program-movie"]', $node);
+    $movie  = false;
+    foreach ($movieV as $val) {
+      $movie = true;
     }
-    $str = preg_replace($patterns, $replacements, $str);
+    $liveV = $xpath->query('.//p[@class="dailyProgram-itemTitle"]/a/i[@class="icon_program-live"]', $node);
+    $live  = false;
+    foreach ($liveV as $val) {
+      $live = true;
+    }
 
-    return $str;
+    $personalitys = $xpath->query('.//p[@class="dailyProgram-itemPersonality"]/a', $node);
+    $personality = [];
+    foreach ($personalitys as $p) {
+      $personality[] = _trim($p->nodeValue, true);
+    }
+
+    $programs[] = [
+      'time'        => _trim($time),
+      'start'       => _trim($times[0]),
+      'startDate'   => $startDate->format('Y-m-d H:i:s'),
+      'startU'      => $startDate->format('U'),
+      'startDt'     => $startDate,
+      'end'         => _trim($times[2]),
+      'endDate'     => $endDate->format('Y-m-d H:i:s'),
+      'endU'        => $endDate->format('U'),
+      'endDt'       => $endDate,
+      'title'       => _trim($title, true),
+      'personality' => _trim(implode(' ', $personality), true),
+      'movie'       => $movie,
+      'live'        => $live,
+    ];
+  }
+
+  return $programs;
 }
 
-function _weekDay($day)
+function _trim($text, $slash = false)
+{
+  $str = mb_convert_encoding($text, 'UTF-8', 'auto');
+  $str = trim($str);
+  $str = mb_convert_kana($str, 'rnasK');
+  $str = preg_replace('/[\n\r\t]/', '', $str);
+  $str = preg_replace('/\s{2,}/', '', $str);
+
+  $tHyphen = '/[\x{207B}\x{208B}\x{2010}\x{2012}\x{2013}\x{2014}\x{2015}\x{2212}\x{2500}\x{2501}\x{2796}\x{3161}\x{FF0D}\x{FF70}]/u';
+  $rHyphen = '-';
+  $str = preg_replace($tHyphen, $rHyphen, $str);
+
+  $patterns     = array('/\?/', '/\*/', '/"/', '/\|/', '/\</', '/\>/', '/\\\/' );
+  $replacements = array('？'  , '＊'  , '\'' , '｜'  , '＜'  , '＞'  , '￥'   );
+  if ($slash) {
+    $patterns     = array_merge($patterns,     array('/\//', '/:/'));
+    $replacements = array_merge($replacements, array('／'  , '：' ));
+  }
+  $str = preg_replace($patterns, $replacements, $str);
+
+
+  return $str;
+}
+
+function programStrcut($title, $personality)
+{
+  $title       = mb_strcut($title, 0, 200);
+  $personality = mb_strcut($personality, 0, 200);
+  $program = $title . $personality;
+  $program = mb_strcut($program, 0, 200);
+
+  return $program;
+}
+
+function sortByKey($keyName, $sortOrder, $array)
+{
+  foreach ($array as $key => $value) {
+    $keyArray[$key] = $value[$keyName];
+  }
+
+  array_multisort($keyArray, $sortOrder, $array);
+
+  return $array;
+}
+
+function searchDateTime($program, $nowDt)
+{
+  $search = $nowDt->format('U');
+  $ret = [];
+  foreach ($program as $p) {
+    if ($p['startU'] <= $search && $p['endU'] >= $search) {
+      $ret = $p;
+    }
+  }
+
+  return $ret;
+}
+
+function titleConcat($p)
+{
+  $title = '';
+  if (isset($p['title'])) {
+    $title .= $p['title'];
+    if (isset($p['repeat'])) {
+      $title .= $p['repeat'] == true ? '[再]' : '[初]';
+    }
+    $title .= $p['movie'] == true ? '[動]' : '';
+    $title .= $p['live']  == true ? '[生]' : '';
+  }
+
+  return $title;
+}
+
+function weekDay($day)
 {
   $dayTime = strtotime($day);
   $weekDay = array( '日', '月', '火', '水', '木', '金', '土');
   return $weekDay[date('w', $dayTime)];
 }
 
-function _bg($str)
+function showProgramTitlePersonality($program)
 {
-    if (_trim($str) == 'bg-l') {
-        $bgStr = '生';
-    } else if (_trim($str) == 'bg-f') {
-        $bgStr = '初';
-    } else if (_trim($str) == 'bg-repeat') {
-        $bgStr = '再';
-    } else {
-        $bgStr = '　';
+  foreach ($program as $p) {
+    if (isset($p['title'])) {
+      $title       = titleConcat($p);
+      $personality = '';
+      if ($p['personality']) {
+        $personality = '(' . $p['personality'] . ')';
+      }
+      $str = programStrcut($title, $personality);
+      echo $str, PHP_EOL;
     }
-
-    return $bgStr;
+  }
 }
 
-function _start($day, $time)
+function showProgramTitleOnly($program)
 {
-    $day  = _trim($day);
-    $day  = substr($day, 0, 5);
-    $dayEx = explode('/', $day);
-
-    $time = _trim($time);
-    $time = substr($time, 0, 5);
-    $timeEx = explode(':', $time);
-
-    $starttime = new DateTime($day);
-
-    if ($timeEx[0] >= 24) {
-        $timeEx[0] = $timeEx[0] - 24;
-        $starttime->modify("+1 days");
+  foreach ($program as $p) {
+    if (isset($p['title'])) {
+      $title = titleConcat($p);
+      $str = programStrcut($title, '');
+      echo $str, PHP_EOL;
     }
-    $starttime->modify("+$timeEx[0] hours $timeEx[1] minutes");
-
-    $YmdHis = $starttime->format('Y/m/d H:i');
-    $His    = $starttime->format('H:i');
-
-    return array($YmdHis, $His);
+  }
 }
 
-function _end($day, $time, $min)
+function showProgramPersonalityOnly($program)
 {
-    $day  = _trim($day);
-    $day  = substr($day, 0, 5);
-    $dayEx = explode('/', $day);
-
-    $time = _trim($time);
-    $time = substr($time, 0, 5);
-    $timeEx = explode(':', $time);
-
-    $min  = _trim($min);
-
-    $endtime = new DateTime($day);
-
-    if ($timeEx[0] >= 24) {
-        $timeEx[0] = $timeEx[0] - 24;
-        $endtime->modify("+1 days");
+  foreach ($program as $p) {
+    if (isset($p['personality'])) {
+      $str = programStrcut('', $p['personality']);
+      echo $str, PHP_EOL;
     }
-    $endtime->modify("+$timeEx[0] hours $timeEx[1] minutes");
-    $endtime->modify("+$min minutes");
-
-    $YmdHis = $endtime->format('Y/m/d H:i');
-    $His    = $endtime->format('H:i');
-
-    return array($YmdHis, $His);
+  }
 }
 
-function _m2s($min)
+function showProgram($program)
 {
-    $min  = _trim($min);
-    return $min * 60;
+  foreach ($program as $p) {
+    if (isset($p['title'])) {
+      $title       = titleConcat($p);
+      $personality = '';
+      if ($p['personality']) {
+        $personality = '(' . $p['personality'] . ')';
+      }
+      echo $p['startDt']->format('Y-m-d'), ' ', weekDay($p['startDate']), ' ', $p['startDt']->format('H:i:s'), ' ', $p['endDt']->format('H:i:s'), ' ', $title,  $personality, PHP_EOL;
+    }
+  }
 }
 
 function usage($argv)
