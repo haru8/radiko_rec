@@ -73,11 +73,11 @@ echo "ファイル名: ${filename}
       -acodec copy           \
       -vcodec copy           \
       -bsf:a aac_adtstoasc   \
-      -metadata artist=${PGPRLTY}  \
-      -metadata title="${PGNAME}"  \
-      -metadata album="${PGTITLE}" \
-      -metadata genre="ラジオ"     \
-      -metadata date="${YEAR}"     \
+      -metadata artist="${PGPRLTY}" \
+      -metadata title="${PGNAME}"   \
+      -metadata album="${PGTITLE}"  \
+      -metadata genre="ラジオ"      \
+      -metadata date="${YEAR}"      \
       -metadata comment="超A&G+
 ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒
 番組タイトル  : ${PGTITLE}
@@ -277,13 +277,13 @@ while [ $LOOP_CNT -lt $LOOP_MAX ]; do
               -y -i "$MP4FILE"    \
               -loglevel warning   \
               -metadata StreamTitle="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
-              -metadata author="超A&G+"    \
-              -metadata artist=${PGPRLTY}  \
-              -metadata title="${PGNAME}"  \
-              -metadata album="${PGTITLE}" \
-              -metadata genre="ラジオ"     \
-              -metadata year="${YEAR}"     \
-              -metadata date="${YEAR}"     \
+              -metadata author="超A&G+"     \
+              -metadata artist="${PGPRLTY}" \
+              -metadata title="${PGNAME}"   \
+              -metadata album="${PGTITLE}"  \
+              -metadata genre="ラジオ"      \
+              -metadata year="${YEAR}"      \
+              -metadata date="${YEAR}"      \
               -metadata comment="超A&G+
 ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒
 番組タイトル  : ${PGTITLE}
