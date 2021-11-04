@@ -1,10 +1,9 @@
 #!/usr/bin/env php
 <?php
-
 $url = 'https://www.joqr.co.jp/qr/agdailyprogram/';
 
 $options = getopt('dntph');
-$opt = array();
+$opt = [];
 $opt['today']     = isset($options['d']) ? true : false; // 今日のみ
 $opt['nowona']    = isset($options['n']) ? true : false; // 今のみ
 $opt['titleonly'] = isset($options['t']) ? true : false; // タイトルのみ
@@ -46,13 +45,8 @@ if ($opt['nowona']) {
   $ret = searchDateTime($program, $nowDt);
   if (count($ret) == 0) {
     $ret = [
-      'startDate'   => '',
-      'endDate'     => '',
       'title'       => '放送休止',
       'personality' => '',
-      'repeat'      => false,
-      'movie'       => false,
-      'live'        => false,
     ];
   }
   $program = [$ret];
@@ -82,25 +76,8 @@ function getDaily($url)
   $date = _trim($date);
   $dt = new DateTimeImmutable($date);
 
-  $dailyProgramAgR  = $xpath->query('//article[@class="dailyProgram-itemBox ag is-repeat"]');
-  $dailyProgramAg   = $xpath->query('//article[@class="dailyProgram-itemBox ag"]');
-  $dailyProgram     = $xpath->query('//article[@class="dailyProgram-itemBox "]');
-  $dailyProgramJoqr = $xpath->query('//article[@class="dailyProgram-itemBox joqr"]');
-
-  $p1 = getProgram($xpath, $dailyProgramAgR, $dt);
-  $p1r = [];
-  foreach ($p1 as $key => $val) {
-    $p1r[$key] = array_merge($val, ['repeat' => true]);
-  }
-  $p2 = getProgram($xpath, $dailyProgramAg, $dt);
-  $p2r = [];
-  foreach ($p2 as $key => $val) {
-    $p2r[$key] = array_merge($val, ['repeat' => false]);
-  }
-  $p3 = getProgram($xpath, $dailyProgram, $dt);
-  $p4 = getProgram($xpath, $dailyProgramJoqr, $dt);
-
-  $program = array_merge($p1r, $p2r, $p3, $p4);
+  $dailyProgram = $xpath->query('//article[contains(@class, "dailyProgram-itemBox")]');
+  $program = getProgram($xpath, $dailyProgram, $dt);
   $program = sortByKey('startU', SORT_ASC, $program);
 
   return $program;
@@ -111,6 +88,16 @@ function getProgram($xpath, $dailyProgram, $dt)
   $programs = [];
 
   foreach ($dailyProgram as $node) {
+    $articleClass = $node->getAttribute('class');
+    $repeat = false;
+    if (strpos($articleClass, 'is-repeat')) {
+      $repeat = true;
+    }
+    $ag = false;
+    if (strpos($articleClass, 'ag')) {
+      $ag = true;
+    }
+
     $time  = $xpath->query('.//h3[@class="dailyProgram-itemHeaderTime"]', $node)->item(0)->nodeValue;
     $times = explode(' ', _trim($time));
     $s = explode(':', _trim($times[0]));
@@ -118,7 +105,7 @@ function getProgram($xpath, $dailyProgram, $dt)
     $startDate = $dt->add(new DateInterval('PT' . _trim($s[0]) . 'H' . (_trim($s[1]) == '00' ? '' : _trim($s[1]) . 'M')));
     $endDate   = $dt->add(new DateInterval('PT' . _trim($e[0]) . 'H' . (_trim($e[1]) == '00' ? '' : _trim($e[1]) . 'M')));
 
-    $title = $xpath->query('.//p[@class="dailyProgram-itemTitle"]/a', $node)->item(0)->nodeValue;
+    $title  = $xpath->query('.//p[@class="dailyProgram-itemTitle"]/a', $node)->item(0)->nodeValue;
     $movieV = $xpath->query('.//p[@class="dailyProgram-itemTitle"]/a/i[@class="icon_program-movie"]', $node);
     $movie  = false;
     foreach ($movieV as $val) {
@@ -136,7 +123,7 @@ function getProgram($xpath, $dailyProgram, $dt)
       $personality[] = _trim($p->nodeValue, true);
     }
 
-    $programs[] = [
+    $item = [
       'time'        => _trim($time),
       'start'       => _trim($times[0]),
       'startDate'   => $startDate->format('Y-m-d H:i:s'),
@@ -148,9 +135,16 @@ function getProgram($xpath, $dailyProgram, $dt)
       'endDt'       => $endDate,
       'title'       => _trim($title, true),
       'personality' => _trim(implode(' ', $personality), true),
+      'repeat'      => $repeat,
       'movie'       => $movie,
       'live'        => $live,
     ];
+
+    if (!$ag) {
+      unset($item['repeat']);
+    }
+
+    $programs[] = $item;
   }
 
   return $programs;
@@ -175,7 +169,6 @@ function _trim($text, $slash = false)
     $replacements = array_merge($replacements, array('／'  , '：' ));
   }
   $str = preg_replace($patterns, $replacements, $str);
-
 
   return $str;
 }
