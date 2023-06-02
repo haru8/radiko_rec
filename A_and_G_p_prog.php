@@ -70,9 +70,8 @@ function getDaily($url)
 
   $xpath = new DOMXPath($dom);
 
-  $date = $xpath->query('//h3[@class="heading_date"]/span[@class="heading_date-text"]')->item(0)->nodeValue;
-  $dof  = $xpath->query('//h3[@class="heading_date"]/span[@class="heading_date-text"]/span[@class="heading_date-small"]')->item(0)->nodeValue;
-  $date = str_replace($dof, '', $date);
+  // exp 6/2
+  $date = $xpath->query('//li[@class="glide__slide is-currentDate"]/a[@class="dailyProgram-dateItem"]/text()')->item(0)->nodeValue;
   $date = _trim($date);
   $dt = new DateTimeImmutable($date);
 
