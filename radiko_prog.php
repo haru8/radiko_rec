@@ -172,8 +172,10 @@ function _trim($str)
     $str = preg_replace('/[\n\r\t]/', ' ', $str);
     $str = preg_replace('/\s{2,}/', ' ', $str);
 
-    $patterns     = array('/\?/', '/\*/', '/\\\/', '/\//', '/:/', '/"/', '/\</', '/\>/', '/\|/' );
-    $replacements = array('？'  , '＊'  , '￥'   , '／'  , '：' , '\'' , '＜'  , '＞'  , '｜') ;
+    //$str = html_entity_decode($str);
+
+    $patterns     = array('/\?/', '/\*/', '/\\\/', '/\//', '/:/', '/"/', '/\</', '/\>/', '/\|/', '/&nbsp;/', '/&ensp;/', '/&emsp;/', '/&thinsp;/' );
+    $replacements = array('？'  , '＊'  , '￥'   , '／'  , '：' , '\'' , '＜'  , '＞'  , '｜', ' ', ' ', ' ', ' ' ) ;
     $str = preg_replace($patterns, $replacements, $str);
 
     return $str;
