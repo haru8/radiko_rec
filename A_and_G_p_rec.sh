@@ -10,8 +10,8 @@ export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH
 BASE=/home/haru/radiko_rec
 STAY_PS_KILL=/home/haru/tool/radiko_rec/stay_ps_kill.sh
 
-REC_URL_HOST="https://fms2.uniqueradio.jp/"
-REC_URL_PATH="agqr10/aandg1.m3u8"
+REC_URL_HOST="https://agcdn02.cdnext.stream.ne.jp/"
+REC_URL_PATH="hls2/basic/data/prog_index.m3u8"
 ALLARG="$@"
 RUN_DATE=`date '+%Y/%m/%d %H:%M:%S'`
 NOW_DATE=`date '+%Y/%m/%d %H:%M:%S'`
@@ -99,9 +99,9 @@ echo "ファイル名: ${filename}
 # 28時間制の日時を作成。
 create_28date() {
     NOW_DATE=`date '+%Y/%m/%d %H:%M:%S'`
-    local -i h=`date -d "$NOW_DATE" '+%k'`
+    local -i h=`date -d "$NOW_DATE" '+%k' | sed 's/ //g'`
     local -i hh
-    local -i hhh
+    local hhh
     if [ $h -le 4 ]; then
         hh=$h+24
         hhh=`printf '%02d\n' $hh`
