@@ -184,8 +184,9 @@ rec() {
         if [ -f ${STATION_XML} ]; then
             rm -f ${STATION_XML}
         fi
+        echo  STATION_XML: ${STREAM_URl_BASE}/${station}.xml
         wget -q ${STREAM_URl_BASE}/${station}.xml -O ${STATION_XML}
-        STREAM_URL=`xmllint --xpath "/urls/url[@areafree='0'][1]/playlist_create_url/text()" ${STATION_XML}`
+        STREAM_URL=`xmllint --xpath "/urls/url[@areafree='1'][2]/playlist_create_url/text()" ${STATION_XML}`
         rm -f ${STATION_XML}
         echo "stream_url: ${STREAM_URL}"
 
