@@ -3,11 +3,7 @@
 # history
 #
 
-export PATH=/usr/lib/qt-3.3/bin:/usr/kerberos/bin:/usr/local/bin:/bin:/usr/bin:/home/${HOME}/bin
-export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
-export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH
-
-BASE=/home/haru/radiko_rec
+BASE=${HOME}/radiko_rec
 AUTHFILE1="/tmp/auth1_fms.$$"
 AUTHFILE2="/tmp/auth2_fms.$$"
 AUTHFILE1URL=https://radiko.jp/v2/api/auth1
@@ -17,11 +13,21 @@ STREAM_URl_BASE=http://radiko.jp/v2/station/stream_smh_multi
 # Define authorize key value ( from http://radiko.jp/apps/js/playerCommon.js )
 RADIKO_AUTHKEY_VALUE="bcd151073c03b352e1ef2fd66c32209da9ca0afa"
 
+FFMPEG=ffmpeg
+WGET=wget
+XMLLINT=xmllint
+DATE=date
+SLACK_SEND=slack_radiko.sh
 
 ALLARG="$@"
 ARGC=$#
-RUN_DATE=`date '+%Y/%m/%d %H:%M:%S'`
-NOW_DATE=`date '+%Y/%m/%d %H:%M:%S'`
+RUN_DATE=`${DATE} '+%Y/%m/%d %H:%M:%S'`
+NOW_DATE=`${DATE} '+%Y/%m/%d %H:%M:%S'`
+
+
+if [ ! -d ${BASE} ]; then
+    mkdir -p ${BASE}
+fi
 
 
 usage() {
@@ -100,14 +106,14 @@ time_check() {
 # 認証キー取得
 get_auth() {
 
-    if [ -f $AUTHFILE1 ]; then
-        rm -f $AUTHFILE1
+    if [ -f ${AUTHFILE1} ]; then
+        rm -f ${AUTHFILE1}
     fi
 
     #
     # access auth1
     #
-    wget -q \
+    ${WGET} -q \
         --header="pragma: no-cache" \
         --header="X-Radiko-App: pc_html5" \
         --header="X-Radiko-App-Version: 0.0.1" \
@@ -115,8 +121,8 @@ get_auth() {
         --header="X-Radiko-Device: pc" \
         --no-check-certificate \
         --save-headers \
-        -O $AUTHFILE1 \
-        $AUTHFILE1URL
+        -O ${AUTHFILE1} \
+        ${AUTHFILE1URL}
 
     if [ $? -ne 0 ]; then
         echo "failed auth1 process"
@@ -131,7 +137,7 @@ get_auth() {
     local length=`cat ${AUTHFILE1} | perl -ne 'print $1 if(/x-radiko-keylength: (\d+)/i)'`
     local partialkey=`echo "${RADIKO_AUTHKEY_VALUE}" | dd bs=1 "skip=${offset}" "count=${length}" 2> /dev/null | base64`
 
-    echo -e "authtoken: ${AUTHTOKEN} \noffset: ${offset} length: ${length} \npartialkey: ${partialkey}"
+    echo -e "authtoken: ${AUTHTOKEN} \noffset: ${offset} \nlength: ${length} \npartialkey: ${partialkey}"
 
     rm -f ${AUTHFILE1}
 
@@ -142,7 +148,7 @@ get_auth() {
     #
     # access auth2
     #
-    wget -q \
+    ${WGET} -q \
          --header="pragma: no-cache" \
          --header="X-Radiko-User: test-stream" \
          --header="X-Radiko-Device: pc" \
@@ -185,8 +191,8 @@ rec() {
             rm -f ${STATION_XML}
         fi
         echo  STATION_XML: ${STREAM_URl_BASE}/${station}.xml
-        wget -q ${STREAM_URl_BASE}/${station}.xml -O ${STATION_XML}
-        STREAM_URL=`xmllint --xpath "/urls/url[@areafree='1'][2]/playlist_create_url/text()" ${STATION_XML}`
+        ${WGET} -q ${STREAM_URl_BASE}/${station}.xml -O ${STATION_XML}
+        STREAM_URL=`${XMLLINT} --xpath "/urls/url[@areafree='1'][2]/playlist_create_url/text()" ${STATION_XML}`
         rm -f ${STATION_XML}
         echo "stream_url: ${STREAM_URL}"
 
@@ -194,10 +200,10 @@ rec() {
 ファイル名: ${filename}
 番組名  : ${PGNAME}
 引数    : ${CMDTITLE}
-開始時間: `date '+%Y/%m/%d %H:%M:%S'`
-録音時間: $rec_time" | ~/bin/slack_radiko.sh -h "録音開始: $$"
+開始時間: `${DATE} '+%Y/%m/%d %H:%M:%S'`
+録音時間: $rec_time" | ${SLACK_SEND} -h "録音開始: $$"
 
-        ffmpeg \
+        ${FFMPEG} \
             -loglevel warning \
             -fflags +discardcorrupt \
             -headers "X-Radiko-Authtoken: ${AUTHTOKEN}" \
@@ -214,8 +220,8 @@ rec() {
 ファイル名: ${filename}
 番組名  : ${PGNAME}
 引数    : ${CMDTITLE}
-終了時間: `date '+%Y/%m/%d %H:%M:%S'`
-録音時間: $rec_time" | ~/bin/slack_radiko.sh -h "録音完了: $$"
+終了時間: `${DATE} '+%Y/%m/%d %H:%M:%S'`
+録音時間: $rec_time" | ${SLACK_SEND} -h "録音完了: $$"
     fi
 
     return $RET
@@ -223,24 +229,24 @@ rec() {
 
 # 28時間制の日時を作成。
 create_28date() {
-    NOW_DATE=`date '+%Y/%m/%d %H:%M:%S'`
-    local -i h=`date -d "$NOW_DATE" '+%k'`
+    NOW_DATE=`${DATE} '+%Y/%m/%d %H:%M:%S'`
+    local -i h=`${DATE} -d "$NOW_DATE" '+%k'`
     local -i hh
     local hhh
     if [ $h -le 4 ]; then
         hh=$h+24
         hhh=`printf '%02d\n' $hh`
-        YMD=`date -d "$NOW_DATE 1 days ago" '+%Y%m%d(%a)'`
-        YEAR=`date -d "$NOW_DATE 1 days ago" '+%Y'`
-        YMD_HMS=`date -d "$NOW_DATE 1 days ago" "+%Y%m%d_$hhh%M%S"`
-        JYMD_HM=`date -d "$NOW_DATE 1 days ago" "+%x $hhh時%M分%S秒"`
+        YMD=`${DATE} -d "$NOW_DATE 1 days ago" '+%Y%m%d(%a)'`
+        YEAR=`${DATE} -d "$NOW_DATE 1 days ago" '+%Y'`
+        YMD_HMS=`${DATE} -d "$NOW_DATE 1 days ago" "+%Y%m%d_$hhh%M%S"`
+        JYMD_HM=`${DATE} -d "$NOW_DATE 1 days ago" "+%x $hhh時%M分%S秒"`
     else
         hh="$h"
         hhh=`printf '%02d\n' $hh`
-        YMD=`date -d "$NOW_DATE" '+%Y%m%d(%a)'`
-        YEAR=`date -d "$NOW_DATE" '+%Y'`
-        YMD_HMS=`date -d "$NOW_DATE" "+%Y%m%d_$hhh%M%S"`
-        JYMD_HM=`date -d "$NOW_DATE" "+%x $hhh時%M分%S秒"`
+        YMD=`${DATE} -d "$NOW_DATE" '+%Y%m%d(%a)'`
+        YEAR=`${DATE} -d "$NOW_DATE" '+%Y'`
+        YMD_HMS=`${DATE} -d "$NOW_DATE" "+%Y%m%d_$hhh%M%S"`
+        JYMD_HM=`${DATE} -d "$NOW_DATE" "+%x $hhh時%M分%S秒"`
     fi
 
     #echo 'h      : ' $h
@@ -263,8 +269,8 @@ create_filename() {
     ST=$1
     station_check "$ST"
     STOP=$2
-    local -i run_s=`date -d "$RUN_DATE" '+%s'`
-    local -i now_s=`date -d "$NOW_DATE" '+%s'`
+    local -i run_s=`${DATE} -d "$RUN_DATE" '+%s'`
+    local -i now_s=`${DATE} -d "$NOW_DATE" '+%s'`
     local -i delay=$now_s-$run_s
     STOP=$STOP-$delay+5
     STOP=`echo $STOP | sed 's/-//g'`
@@ -283,7 +289,7 @@ create_filename() {
     YMD_HMS_CNT=`echo -n "${YMD_HMS}"_ | wc -c`
     STATION_CNT=`echo -n "(${STATION})" | wc -c`
     STOP_CNT=`echo -n "_${STOP}" | wc -c`
-    STR_CNT=`expr + ${YMD_HMS_CNT} + ${STATION_CNT} + ${STOP_CNT}`
+    STR_CNT=`expr ${YMD_HMS_CNT} + ${STATION_CNT} + ${STOP_CNT}`
     FILENAME_STR_MAX=`expr 250 - ${STR_CNT}`
     PGNAME=`php -r "echo mb_strcut(\"${PGNAME}\", 0, ${FILENAME_STR_MAX});"`
 
@@ -356,7 +362,7 @@ declare -i REC_MAX=30
 RETVAL1=10
 while [ $RETVAL1 != 0 ]; do
     echo -n rec start :
-    date
+    ${DATE}
     create_filename "$@"
     echo "REC_CNT = $REC_CNT"
     echo ''
@@ -384,7 +390,7 @@ echo LOOP_MAX=$LOOP_MAX
 while [ $LOOP_CNT -lt $LOOP_MAX ]; do
     echo LOOP_CNT=$LOOP_CNT
     echo -n ffmpeg start :
-    date
+    ${DATE}
 
     M4AFILE="${M4AS[$LOOP_CNT]}"
     MP3FILE="${MP3S[$LOOP_CNT]}"
@@ -396,9 +402,9 @@ while [ $LOOP_CNT -lt $LOOP_MAX ]; do
     ENC_END=''
 
     if [ -f "$M4AFILE" ]; then
-        ENC_START=`date +%s`
+        ENC_START=`${DATE} +%s`
         M4AFILESIZE=`ls -lh "$M4AFILE" | awk '{print $5}'`
-        /usr/local/bin/ffmpeg \
+        ${FFMPEG} \
           -y -i "$M4AFILE"  \
           -loglevel warning \
           -metadata StreamTitle="${NAME} ${JYMD_HM} ～ ${REC_MIN}分${REC_SEC}秒" \
@@ -419,8 +425,8 @@ ${CMDTITLE}" \
         echo "ffmpeg RETVAL2 = $RETVAL2"
         echo -n ffmpeg end   :
         MP3FILESIZE=`ls -lh "$MP3FILE" | awk '{print $5}'`
-        date
-        ENC_END=`date +%s`
+        ${DATE}
+        ENC_END=`${DATE} +%s`
         echo ''
 
         M4A_SIZE=`ls -l "$M4AFILE" | awk '{ print $5}'`
@@ -441,14 +447,14 @@ ${CMDTITLE}" \
         fi
         echo "エンコード結果
 LOOP_CNT / LOOP_MAX: ${LOOP_CNT} / ${LOOP_MAX}
-終了時間  : `date '+%Y/%m/%d %H:%M:%S'`
+終了時間  : `${DATE} '+%Y/%m/%d %H:%M:%S'`
 エンコード時間 : `expr $ENC_END - $ENC_START`
 ファイル名: ${M4AFILE}
 番組名    : ${PGNAME}
 引数      : ${CMDTITLE}
 M4AFILE   : `basename "${M4AFILE}"` : ${M4AFILESIZE}
 MP3FILE   : `basename "${MP3FILE}"` : ${MP3FILESIZE}
-RATE      : ${RATE} : MAX=$MAX  MIN=$MIN" | ~/bin/slack_radiko.sh -h "エンコード結果: $$"
+RATE      : ${RATE} : MAX=$MAX  MIN=$MIN" | ${SLACK_SEND} -h "エンコード結果: $$"
     fi
     LOOP_CNT=$LOOP_CNT+1
 done
